@@ -1,0 +1,22 @@
+.. _sequenceinfo:
+
+sequenceinfo
+************
+
+
+**Syntax:** :code:`sequenceinfo(filename template)`
+
+Displays metadata of image sequence.
+
+This command can be used in the distributed processing mode, but it does not participate in distributed processing.
+
+Arguments
+---------
+
+filename template [input]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Data type:** string
+
+Filename template corresponding to the sequence. The template must specify a directory name and/or file name template including wildcards \*, ?, @ that identifies files that belong to the sequence. Wildcard \* corresponds to any sequence, ? to any character, and @ to one or more numerical digits.
+

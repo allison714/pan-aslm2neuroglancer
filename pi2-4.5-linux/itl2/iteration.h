@@ -1,0 +1,332 @@
+#pragma once
+
+// NOTE: This file contains experiments on "new-style" iteration that is to replace most loops over the image,
+// and in particular replace pointprocess.h.
+
+#include "image.h"
+#include "math/aabox.h"
+#include "progress.h"
+#include "connectivity.h"
+
+namespace itl2
+{
+
+	/**
+	Call lambda(x, y, z) for all (x, y, z) in range [block.minc, block.maxc[.
+	*/
+	template<typename F>
+	void forAllInBox(const AABox<coord_t>& block, F&& lambda)
+	{
+		//#pragma omp parallel for if(block.volume() > PARALLELIZATION_THRESHOLD && !omp_in_parallel())
+		//for (coord_t z = block.minc.z; z < block.maxc.z; z++)
+		//{
+		//	for (coord_t y = block.minc.y; y < block.maxc.y; y++)
+		//	{
+		//		for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+		//		{
+		//			lambda(x, y, z);
+		//		}
+		//	}
+		//}
+
+		//coord_t w = block.width();
+		//coord_t h = block.height();
+		//coord_t d = block.depth();
+		//coord_t dh = d * h;
+		//#pragma omp parallel for if(block.volume() > PARALLELIZATION_THRESHOLD && !omp_in_parallel())
+		//for (coord_t k = 0; k < dh; k++)
+		//{
+		//	coord_t z = k / h + block.minc.z;
+		//	coord_t y = k % h + block.minc.y;
+		//	for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+		//	{
+		//		lambda(x, y, z);
+		//	}
+		//}
+
+		coord_t w = block.width();
+		coord_t h = block.height();
+		coord_t d = block.depth();
+
+		if (d <= 0)
+		{
+			return;
+		}
+		else if (d <= 1)
+		{
+			// 2D image
+			ProgressIndicator progress(block.maxc.y - block.minc.y);
+			#pragma omp parallel for if(block.volume() > PARALLELIZATION_THRESHOLD && !omp_in_parallel())
+			for (coord_t y = block.minc.y; y < block.maxc.y; y++)
+			{
+				for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+				{
+					lambda(x, y, block.minc.z);
+				}
+				progress.step();
+			}
+		}
+		else
+		{
+			// 3D image
+			ProgressIndicator progress(block.maxc.z - block.minc.z);
+			#pragma omp parallel for if(block.volume() > PARALLELIZATION_THRESHOLD && !omp_in_parallel())
+			for (coord_t z = block.minc.z; z < block.maxc.z; z++)
+			{
+				for (coord_t y = block.minc.y; y < block.maxc.y; y++)
+				{
+					for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+					{
+						lambda(x, y, z);
+					}
+				}
+				progress.step();
+			}
+		}
+	}
+
+	inline size_t countChunks(const Vec3c& imageDimensions, const Vec3c& chunkSize)
+	{
+		Vec3c chunkStart(0, 0, 0);
+		size_t chunkCount = 0;
+		while (chunkStart.z < imageDimensions.z)
+		{
+			while (chunkStart.y < imageDimensions.y)
+			{
+				while (chunkStart.x < imageDimensions.x)
+				{
+					chunkCount++;
+					chunkStart.x += chunkSize.x;
+				}
+				chunkStart.x = 0;
+				chunkStart.y += chunkSize.y;
+			}
+			chunkStart.x = 0;
+			chunkStart.y = 0;
+			chunkStart.z += chunkSize.z;
+		}
+		return chunkCount;
+	}
+
+
+	/**
+	Call lambda(chunkIndex, chunkStart) for all chunks in an image of given dimensions and chunk size.
+	*/
+	template<typename F>
+	void forAllChunks(const Vec3c& imageDimensions, const Vec3c& chunkSize, F&& lambda)
+	{
+
+		size_t maxSteps = 0;
+		maxSteps = countChunks(imageDimensions, chunkSize);
+		ProgressIndicator progress(maxSteps);
+
+		Vec3c chunkStart(0, 0, 0);
+		Vec3c chunkIndex(0, 0, 0);
+		while (chunkStart.z < imageDimensions.z)
+		{
+			while (chunkStart.y < imageDimensions.y)
+			{
+				while (chunkStart.x < imageDimensions.x)
+				{
+					lambda(chunkIndex, chunkStart);
+					progress.step();
+
+					chunkIndex.x++;
+					chunkStart.x += chunkSize.x;
+				}
+
+				chunkIndex.x = 0;
+				chunkIndex.y++;
+				chunkStart.x = 0;
+				chunkStart.y += chunkSize.y;
+			}
+			chunkIndex.x = 0;
+			chunkIndex.y = 0;
+			chunkIndex.z++;
+			chunkStart.x = 0;
+			chunkStart.y = 0;
+			chunkStart.z += chunkSize.z;
+		}
+	}
+
+	/**
+	Call lambda(coord_t x, coord_t y, coord_t z) for all pixels in the image.
+	*/
+	template<typename F>
+	void forAllPixels(const ImageBase& img, F&& lambda)
+	{
+		forAllInBox(AABox<coord_t>::fromMinMax(Vec3c(), img.dimensions()), lambda);
+	}
+
+	/**
+	Perform img(x, y, z) = pixelRound<pixel_t>(lambda(img(x, y, z))) for all (x, y, z) in the image.
+	*/
+	template<typename pixel_t, typename F>
+	void forAll(Image<pixel_t>& img, F&& lambda)
+	{
+		forAllPixels(img, [&](coord_t x, coord_t y, coord_t z)
+			{
+				img(x, y, z) = pixelRound<pixel_t>(lambda(img(x, y, z)));
+			});
+	}
+
+	/**
+	Perform l(x, y, z) = pixelRound<pixel_t>(lambda(l(x, y, z), r(x, y, z))) for all (x, y, z) in the image.
+	*/
+	template<typename pixel1_t, typename pixel2_t, typename F>
+	void forAll(Image<pixel1_t>& l, const Image<pixel2_t>& r, F&& lambda)
+	{
+		l.ensureSize(r);
+		forAllPixels(l, [&](coord_t x, coord_t y, coord_t z)
+			{
+				l(x, y, z) = pixelRound<pixel1_t>(lambda(l(x, y, z), r(x, y, z)));
+			});
+	}
+
+
+	namespace internals
+	{
+
+		/**
+		Helper for forEdges function.
+		Processes x and y edges for given z. The z coordinate must be in [block.minc.z+1, block.maxc.z-2].
+		This code is from StackOverflow: https://stackoverflow.com/questions/53432767/how-to-iterate-over-pixels-on-edge-of-a-square-in-1-iteration
+		*/
+		template<typename F>
+		void forEdgesHelperXY(const AABox<coord_t>& block, F&& lambda, coord_t z, size_t boxDimensionality)
+		{
+			// y = block.minc.y
+			if (boxDimensionality >= 2)
+			{
+				for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+				{
+					lambda(x, block.minc.y, z);
+				}
+
+				// y in block
+				for (coord_t y = block.minc.y + 1; y < block.maxc.y - 1; y++)
+				{
+					lambda(block.minc.x, y, z);
+					lambda(block.maxc.x - 1, y, z);
+				}
+
+				// y = block.maxc.y - 1
+				for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+				{
+					lambda(x, block.maxc.y - 1, z);
+				}
+			}
+			else
+			{
+				for (coord_t y = block.minc.y; y < block.maxc.y; y++)
+				{
+					lambda(block.minc.x, y, z);
+					lambda(block.maxc.x - 1, y, z);
+				}
+			}
+		}
+	}
+
+	/**
+	Call lambda(x, y, z) for all (x, y, z) in the edges of the box that spans [block.minc, block.maxc[.
+	This function is not multi-threaded and processes the edge points in the same order every time.
+	Each edge point is processed once.
+	@param boxDimensionality If 1, fills only x-directional edges. If 2, fills x- and y-directional edges. If 3, fills x-, y-, and z-directional edges.
+	*/
+	template<typename F>
+	void forEdges(const AABox<coord_t>& block, size_t boxDimensionality, F&& lambda)
+	{
+		if (boxDimensionality >= 3)
+		{
+			// z = block.minc.z
+			coord_t z = block.minc.z;
+			for (coord_t y = block.minc.y; y < block.maxc.y; y++)
+			{
+				for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+				{
+					lambda(x, y, z);
+				}
+			}
+
+			// z between block.minc.z + 1 and block.maxc.z - 1
+			for (coord_t z = block.minc.z + 1; z < block.maxc.z - 1; z++)
+			{
+				internals::forEdgesHelperXY(block, lambda, z, boxDimensionality);
+			}
+
+			// z = block.maxc.z - 1
+			z = block.maxc.z - 1;
+			for (coord_t y = block.minc.y; y < block.maxc.y; y++)
+			{
+				for (coord_t x = block.minc.x; x < block.maxc.x; x++)
+				{
+					lambda(x, y, z);
+				}
+			}
+		}
+		else
+		{
+			for (coord_t z = block.minc.z; z < block.maxc.z; z++)
+			{
+				internals::forEdgesHelperXY(block, lambda, z, boxDimensionality);
+			}
+		}
+	}
+
+	/**
+	Call lambda(x, y, z) for all (x, y, z) that are neighbours of the given point, considering the given connectivity.
+	The calls of the lambda are made sequentially and every time in the same order.
+	Does not call the lambda for the central point itself, only for the neighbours.
+	*/
+	template<typename F>
+	void forNeighbours(const Vec3c& point, Connectivity connectivity, F&& lambda)
+	{
+		switch(connectivity)
+		{
+		case Connectivity::NearestNeighbours:
+			lambda(point.x, point.y, point.z - 1);
+			lambda(point.x - 1, point.y, point.z);
+			lambda(point.x + 1, point.y, point.z);
+			lambda(point.x, point.y - 1, point.z);
+			lambda(point.x, point.y + 1, point.z);
+			lambda(point.x, point.y, point.z + 1);
+
+			break;
+		case Connectivity::AllNeighbours:
+			lambda(point.x - 1, point.y - 1, point.z - 1);
+			lambda(point.x, point.y - 1, point.z - 1);
+			lambda(point.x + 1, point.y - 1, point.z - 1);
+			lambda(point.x - 1, point.y, point.z - 1);
+			lambda(point.x, point.y, point.z - 1);
+			lambda(point.x + 1, point.y, point.z - 1);
+			lambda(point.x - 1, point.y + 1, point.z - 1);
+			lambda(point.x, point.y + 1, point.z - 1);
+			lambda(point.x + 1, point.y + 1, point.z - 1);
+
+			lambda(point.x - 1, point.y - 1, point.z);
+			lambda(point.x, point.y - 1, point.z);
+			lambda(point.x + 1, point.y - 1, point.z);
+			lambda(point.x - 1, point.y, point.z);
+			//lambda(point.x    , point.y    , point.z    ); // This is the central point, not a neighbour
+			lambda(point.x + 1, point.y, point.z);
+			lambda(point.x - 1, point.y + 1, point.z);
+			lambda(point.x, point.y + 1, point.z);
+			lambda(point.x + 1, point.y + 1, point.z);
+
+			lambda(point.x - 1, point.y - 1, point.z + 1);
+			lambda(point.x, point.y - 1, point.z + 1);
+			lambda(point.x + 1, point.y - 1, point.z + 1);
+			lambda(point.x - 1, point.y, point.z + 1);
+			lambda(point.x, point.y, point.z + 1);
+			lambda(point.x + 1, point.y, point.z + 1);
+			lambda(point.x - 1, point.y + 1, point.z + 1);
+			lambda(point.x, point.y + 1, point.z + 1);
+			lambda(point.x + 1, point.y + 1, point.z + 1);
+
+			break;
+		default:
+			throw ITLException("Invalid connectivity in forNeighbours.");
+		}
+	}
+	
+}

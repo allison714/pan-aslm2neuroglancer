@@ -1,0 +1,392 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug no OpenCL|x64">
+      <Configuration>Debug no OpenCL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release no OpenCL|x64">
+      <Configuration>Release no OpenCL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{58FEC952-8144-4B6D-9A31-A85784BF038A}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>pilib</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(CUDA_PATH)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(CUDA_PATH)\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration)</LibraryPath>
+    <TargetName>pi</TargetName>
+    <PostBuildEventUseInBuild>
+    </PostBuildEventUseInBuild>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration)</LibraryPath>
+    <TargetName>pi</TargetName>
+    <PostBuildEventUseInBuild />
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(CUDA_PATH)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(CUDA_PATH)\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration)</LibraryPath>
+    <TargetName>pi</TargetName>
+    <PostBuildEventUseInBuild>
+    </PostBuildEventUseInBuild>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration)</LibraryPath>
+    <TargetName>pi</TargetName>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <PostBuildEventUseInBuild>
+    </PostBuildEventUseInBuild>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;PILIB_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;itl2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>
+      </Message>
+    </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>copy "$(SolutionDir)python_scripts\*.py" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.txt" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.cmd" "$(OutDir)"
+copy "$(SolutionDir)fftw-3.3.5-dll64\libfftw3f-3.dll" "$(OutDir)"
+copy "$(SolutionDir)LICENSE.txt" "$(OutDir)"</Command>
+      <Outputs>non-existent-file</Outputs>
+      <Message>Copy Python and config files to bin directory.</Message>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>$(ProjectDir)create_commit_info.cmd</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Create version file from GIT</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>NO_OPENCL;_DEBUG;_WINDOWS;_USRDLL;PILIB_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;itl2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>
+      </Message>
+    </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>copy "$(SolutionDir)python_scripts\*.py" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.txt" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.cmd" "$(OutDir)"
+copy "$(SolutionDir)fftw-3.3.5-dll64\libfftw3f-3.dll" "$(OutDir)"
+copy "$(SolutionDir)LICENSE.txt" "$(OutDir)"</Command>
+      <Outputs>non-existent-file</Outputs>
+      <Message>Copy Python and config files to bin directory.</Message>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>$(ProjectDir)create_commit_info.cmd</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Create version file from GIT</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;PILIB_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;itl2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+      <Message>
+      </Message>
+    </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>copy "$(SolutionDir)python_scripts\*.py" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.txt" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.cmd" "$(OutDir)"
+copy "$(SolutionDir)fftw-3.3.5-dll64\libfftw3f-3.dll" "$(OutDir)"
+copy "$(SolutionDir)LICENSE.txt" "$(OutDir)"</Command>
+      <Outputs>non-existent-file</Outputs>
+      <Message>Copy Python and config files to bin directory.</Message>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>$(ProjectDir)create_commit_info.cmd</Command>
+      <Message>Create version file from GIT</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NO_OPENCL;NDEBUG;_WINDOWS;_USRDLL;PILIB_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;itl2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+      <Message>
+      </Message>
+    </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>copy "$(SolutionDir)python_scripts\*.py" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.txt" "$(OutDir)"
+copy "$(SolutionDir)example_config\*.cmd" "$(OutDir)"
+copy "$(SolutionDir)fftw-3.3.5-dll64\libfftw3f-3.dll" "$(OutDir)"
+copy "$(SolutionDir)LICENSE.txt" "$(OutDir)"</Command>
+      <Outputs>non-existent-file</Outputs>
+      <Message>Copy Python and config files to bin directory.</Message>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>$(ProjectDir)create_commit_info.cmd</Command>
+      <Message>Create version file from GIT</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="argumentdatatype.h" />
+    <ClInclude Include="autothresholdcommands.h" />
+    <ClInclude Include="carpetcommands.h" />
+    <ClInclude Include="command.h" />
+    <ClInclude Include="commandargument.h" />
+    <ClInclude Include="commandlist.h" />
+    <ClInclude Include="commandmacros.h" />
+    <ClInclude Include="commandsbase.h" />
+    <ClInclude Include="convertcommands.h" />
+    <ClInclude Include="delayed.h" />
+    <ClInclude Include="distributecommands.h" />
+    <ClInclude Include="distributedimagestoragetype.h" />
+    <ClInclude Include="distributedtempimage.h" />
+    <ClInclude Include="dmapcommands.h" />
+    <ClInclude Include="distributable.h" />
+    <ClInclude Include="distributedimage.h" />
+    <ClInclude Include="distributor.h" />
+    <ClInclude Include="evalcommands.h" />
+    <ClInclude Include="exeutils.h" />
+    <ClInclude Include="filtercommands.h" />
+    <ClInclude Include="floodfillcommands.h" />
+    <ClInclude Include="generationcommands.h" />
+    <ClInclude Include="helpformat.h" />
+    <ClInclude Include="histogramcommands.h" />
+    <ClInclude Include="infocommand.h" />
+    <ClInclude Include="inpaintcommands.h" />
+    <ClInclude Include="iocommands.h" />
+    <ClInclude Include="jobtype.h" />
+    <ClInclude Include="localdistributor.h" />
+    <ClInclude Include="lsfdistributor.h" />
+    <ClInclude Include="maximacommands.h" />
+    <ClInclude Include="metadatacommands.h" />
+    <ClInclude Include="othercommands.h" />
+    <ClInclude Include="overlapdistributable.h" />
+    <ClInclude Include="parsedargtype.h" />
+    <ClInclude Include="parseexception.h" />
+    <ClInclude Include="particlescommands.h" />
+    <ClInclude Include="pathcommands.h" />
+    <ClInclude Include="pilib.h" />
+    <ClInclude Include="pisystem.h" />
+    <ClInclude Include="pointprocesscommands.h" />
+    <ClInclude Include="projectioncommands.h" />
+    <ClInclude Include="pstream.h" />
+    <ClInclude Include="slurmdistributor.h" />
+    <ClInclude Include="specialcommands.h" />
+    <ClInclude Include="standardhelp.h" />
+    <ClInclude Include="structurecommands.h" />
+    <ClInclude Include="thickmapcommands.h" />
+    <ClInclude Include="thinandskeletoncommands.h" />
+    <ClInclude Include="timing.h" />
+    <ClInclude Include="tomocommands.h" />
+    <ClInclude Include="transformcommands.h" />
+    <ClInclude Include="trivialdistributable.h" />
+    <ClInclude Include="pilibutilities.h" />
+    <ClInclude Include="valueobject.h" />
+    <ClInclude Include="whereami.h" />
+    <ClInclude Include="whereamicpp.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\itl2\interpolation.cpp" />
+    <ClCompile Include="argumentdatatype.cpp" />
+    <ClCompile Include="autothresholdcommands.cpp" />
+    <ClCompile Include="carpetcommands.cpp" />
+    <ClCompile Include="command.cpp" />
+    <ClCompile Include="commandargument.cpp" />
+    <ClCompile Include="commandlist.cpp" />
+    <ClCompile Include="convertcommands.cpp" />
+    <ClCompile Include="delayed.cpp" />
+    <ClCompile Include="distributable.cpp" />
+    <ClCompile Include="distributecommands.cpp" />
+    <ClCompile Include="distributedimage.cpp" />
+    <ClCompile Include="distributor.cpp" />
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="dmapcommands.cpp" />
+    <ClCompile Include="evalcommands.cpp" />
+    <ClCompile Include="exeutils.cpp" />
+    <ClCompile Include="filtercommands.cpp" />
+    <ClCompile Include="floodfillcommands.cpp" />
+    <ClCompile Include="generationcommands.cpp" />
+    <ClCompile Include="histogramcommands.cpp" />
+    <ClCompile Include="infocommand.cpp" />
+    <ClCompile Include="inpaintcommands.cpp" />
+    <ClCompile Include="iocommands.cpp" />
+    <ClCompile Include="localdistributor.cpp" />
+    <ClCompile Include="lsfdistributor.cpp" />
+    <ClCompile Include="maximacommands.cpp" />
+    <ClCompile Include="metadatacommands.cpp" />
+    <ClCompile Include="othercommands.cpp" />
+    <ClCompile Include="particlescommands.cpp" />
+    <ClCompile Include="pathcommands.cpp" />
+    <ClCompile Include="pilib.cpp" />
+    <ClCompile Include="pisystem.cpp" />
+    <ClCompile Include="pointprocesscommands.cpp" />
+    <ClCompile Include="projectioncommands.cpp" />
+    <ClCompile Include="slurmdistributor.cpp" />
+    <ClCompile Include="specialcommands.cpp" />
+    <ClCompile Include="structurecommands.cpp" />
+    <ClCompile Include="thickmapcommands.cpp" />
+    <ClCompile Include="thinandskeletoncommands.cpp" />
+    <ClCompile Include="timing.cpp" />
+    <ClCompile Include="tomocommands.cpp" />
+    <ClCompile Include="transformcommands.cpp" />
+    <ClCompile Include="pilibutilities.cpp" />
+    <ClCompile Include="whereami.c" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,402 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug no OpenCL|x64">
+      <Configuration>Debug no OpenCL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release no OpenCL|x64">
+      <Configuration>Release no OpenCL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="analyzers.h" />
+    <ClInclude Include="autothreshold.h" />
+    <ClInclude Include="boundarycondition.h" />
+    <ClInclude Include="buffer.h" />
+    <ClInclude Include="buildsettings.h" />
+    <ClInclude Include="byteorder.h" />
+    <ClInclude Include="carpet.h" />
+    <ClInclude Include="connectivity.h" />
+    <ClInclude Include="conversions.h" />
+    <ClInclude Include="convexhull.h" />
+    <ClInclude Include="csa.h" />
+    <ClInclude Include="danielsson.h" />
+    <ClInclude Include="datatypes.h" />
+    <ClInclude Include="diskmappedbuffer.h" />
+    <ClInclude Include="dmap.h" />
+    <ClInclude Include="eval.h" />
+    <ClInclude Include="exprtk\exprtk.hpp" />
+    <ClInclude Include="fastbilateralfilter.h" />
+    <ClInclude Include="fastmaxminfilters.h" />
+    <ClInclude Include="fft.h" />
+    <ClInclude Include="filesystem.h" />
+    <ClInclude Include="fillskeleton.h" />
+    <ClInclude Include="filters.h" />
+    <ClInclude Include="floodfill.h" />
+    <ClInclude Include="generation.h" />
+    <ClInclude Include="getslice.h" />
+    <ClInclude Include="heaps.h" />
+    <ClInclude Include="histogram.h" />
+    <ClInclude Include="imagemetadata.h" />
+    <ClInclude Include="io\distributedimageprocess.h" />
+    <ClInclude Include="io\fopen_s.h" />
+    <ClInclude Include="io\ini.h" />
+    <ClInclude Include="io\inireader.h" />
+    <ClInclude Include="io\itldicom.h" />
+    <ClInclude Include="io\itljpeg.h" />
+    <ClInclude Include="io\itllz4.h" />
+    <ClInclude Include="io\json.h" />
+    <ClInclude Include="io\nn5.h" />
+    <ClInclude Include="io\nn5compression.h" />
+    <ClInclude Include="io\zarr.h" />
+    <ClInclude Include="io\zarrcodecs.h" />
+    <ClInclude Include="io\nrrd.h" />
+    <ClInclude Include="io\pcr.h" />
+    <ClInclude Include="io\vectorio.h" />
+    <ClInclude Include="iteration.h" />
+    <ClInclude Include="listandimage.h" />
+    <ClInclude Include="lz4\lz4.h" />
+    <ClInclude Include="lz4\lz4frame.h" />
+    <ClInclude Include="lz4\lz4hc.h" />
+    <ClInclude Include="lz4\xxhash.h" />
+    <ClInclude Include="marchingcubes.h" />
+    <ClInclude Include="math\aabox.h" />
+    <ClInclude Include="math\box.h" />
+    <ClInclude Include="math\capsule.h" />
+    <ClInclude Include="math\ellipsoid.h" />
+    <ClInclude Include="math\line.h" />
+    <ClInclude Include="math\ludecomposition.h" />
+    <ClInclude Include="math\matrix2x2.h" />
+    <ClInclude Include="math\qrdecomposition.h" />
+    <ClInclude Include="maxima.h" />
+    <ClInclude Include="montage.h" />
+    <ClInclude Include="pathopening.h" />
+    <ClInclude Include="progress.h" />
+    <ClInclude Include="sdmap.h" />
+    <ClInclude Include="surfaceskeleton2.h" />
+    <ClInclude Include="image.h" />
+    <ClInclude Include="indexforest.h" />
+    <ClInclude Include="inpaint.h" />
+    <ClInclude Include="interpolationmode.h" />
+    <ClInclude Include="interpolation.h" />
+    <ClInclude Include="io\alphanum.h" />
+    <ClInclude Include="io\fileutils.h" />
+    <ClInclude Include="io\imagedatatype.h" />
+    <ClInclude Include="io\io.h" />
+    <ClInclude Include="io\itlpng.h" />
+    <ClInclude Include="io\itltiff.h" />
+    <ClInclude Include="io\raw.h" />
+    <ClInclude Include="io\sequence.h" />
+    <ClInclude Include="io\vol.h" />
+    <ClInclude Include="itlexception.h" />
+    <ClInclude Include="lineskeleton.h" />
+    <ClInclude Include="math\conjugategradient.h" />
+    <ClInclude Include="math\dsyevc3.h" />
+    <ClInclude Include="math\dsyevh3.h" />
+    <ClInclude Include="math\dsyevq3.h" />
+    <ClInclude Include="math\dsytrd3.h" />
+    <ClInclude Include="math\eig2.h" />
+    <ClInclude Include="math\geometry.h" />
+    <ClInclude Include="math\mathutils.h" />
+    <ClInclude Include="math\matrix.h" />
+    <ClInclude Include="math\matrix3x3.h" />
+    <ClInclude Include="math\numberutils.h" />
+    <ClInclude Include="math\vec2.h" />
+    <ClInclude Include="math\vec3.h" />
+    <ClInclude Include="math\vec4.h" />
+    <ClInclude Include="math\vectoroperations.h" />
+    <ClInclude Include="median.h" />
+    <ClInclude Include="memorybuffer.h" />
+    <ClInclude Include="minhash.h" />
+    <ClInclude Include="misc.h" />
+    <ClInclude Include="neighbourhood.h" />
+    <ClInclude Include="neighbourhoodtype.h" />
+    <ClInclude Include="network.h" />
+    <ClInclude Include="noise.h" />
+    <ClInclude Include="ompatomic.h" />
+    <ClInclude Include="particleanalysis.h" />
+    <ClInclude Include="pointprocess.h" />
+    <ClInclude Include="projections.h" />
+    <ClInclude Include="raytrace.h" />
+    <ClInclude Include="regionremoval.h" />
+    <ClInclude Include="registration.h" />
+    <ClInclude Include="surfaceskeleton.h" />
+    <ClInclude Include="resultstable.h" />
+    <ClInclude Include="sphere.h" />
+    <ClInclude Include="stitching.h" />
+    <ClInclude Include="stringutils.h" />
+    <ClInclude Include="structure.h" />
+    <ClInclude Include="surfacecurvature.h" />
+    <ClInclude Include="test.h" />
+    <ClInclude Include="testutils.h" />
+    <ClInclude Include="thickmap.h" />
+    <ClInclude Include="timer.h" />
+    <ClInclude Include="tomo\fbp.h" />
+    <ClInclude Include="tomo\siddonprojections.h" />
+    <ClInclude Include="traceskeleton.h" />
+    <ClInclude Include="traceskeletonpoints.h" />
+    <ClInclude Include="transform.h" />
+    <ClInclude Include="type.h" />
+    <ClInclude Include="utilities.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="autothreshold.cpp" />
+    <ClCompile Include="carpet.cpp" />
+    <ClCompile Include="csa.cpp" />
+    <ClCompile Include="danielsson.cpp" />
+    <ClCompile Include="diskmappedbuffer.cpp" />
+    <ClCompile Include="heaps.cpp" />
+    <ClCompile Include="interpolation.cpp" />
+    <ClCompile Include="io\itldicom.cpp" />
+    <ClCompile Include="io\itljpeg.cpp" />
+    <ClCompile Include="io\itllz4.cpp" />
+    <ClCompile Include="io\nn5.cpp" />
+    <ClCompile Include="io\zarr.cpp" />
+    <ClCompile Include="listandimage.cpp" />
+    <ClCompile Include="lz4\lz4.c" />
+    <ClCompile Include="lz4\lz4frame.c" />
+    <ClCompile Include="lz4\lz4hc.c" />
+    <ClCompile Include="lz4\xxhash.c" />
+    <ClCompile Include="math\aabox.cpp" />
+    <ClCompile Include="math\vec2.cpp" />
+    <ClCompile Include="sdmap.cpp" />
+    <ClCompile Include="eval.cpp" />
+    <ClCompile Include="generation.cpp" />
+    <ClCompile Include="fastbilateralfilter.cpp" />
+    <ClCompile Include="fillskeleton.cpp" />
+    <ClCompile Include="imagemetadata.cpp" />
+    <ClCompile Include="io\ini.cpp" />
+    <ClCompile Include="io\inireader.cpp" />
+    <ClCompile Include="io\io.cpp" />
+    <ClCompile Include="io\nrrd.cpp" />
+    <ClCompile Include="io\pcr.cpp" />
+    <ClCompile Include="io\tiff.cpp" />
+    <ClCompile Include="io\vol.cpp" />
+    <ClCompile Include="math\matrix.cpp" />
+    <ClCompile Include="math\vec3.cpp" />
+    <ClCompile Include="maxima.cpp" />
+    <ClCompile Include="minhash.cpp" />
+    <ClCompile Include="montage.cpp" />
+    <ClCompile Include="numberutils.cpp" />
+    <ClCompile Include="particleanalysis.cpp" />
+    <ClCompile Include="dmap.cpp" />
+    <ClCompile Include="fastmaxminfilters.cpp" />
+    <ClCompile Include="fft.cpp" />
+    <ClCompile Include="filters.cpp" />
+    <ClCompile Include="floodfill.cpp" />
+    <ClCompile Include="histogram.cpp" />
+    <ClCompile Include="image.cpp" />
+    <ClCompile Include="inpaint.cpp" />
+    <ClCompile Include="io\fileutils.cpp" />
+    <ClCompile Include="io\png.cpp" />
+    <ClCompile Include="io\sequence.cpp" />
+    <ClCompile Include="math\dsyevc3.cpp" />
+    <ClCompile Include="math\dsyevh3.cpp" />
+    <ClCompile Include="math\dsyevq3.cpp" />
+    <ClCompile Include="math\dsytrd3.cpp" />
+    <ClCompile Include="math\matrix3x3.cpp" />
+    <ClCompile Include="misc.cpp" />
+    <ClCompile Include="neighbourhood.cpp" />
+    <ClCompile Include="network.cpp" />
+    <ClCompile Include="pathopening.cpp" />
+    <ClCompile Include="pointprocess.cpp" />
+    <ClCompile Include="progress.cpp" />
+    <ClCompile Include="projections.cpp" />
+    <ClCompile Include="raw.cpp" />
+    <ClCompile Include="regionremoval.cpp" />
+    <ClCompile Include="registration.cpp" />
+    <ClCompile Include="resultstable.cpp" />
+    <ClCompile Include="skeleton.cpp" />
+    <ClCompile Include="stitching.cpp" />
+    <ClCompile Include="stringutils.cpp" />
+    <ClCompile Include="structure.cpp" />
+    <ClCompile Include="surfacecurvature.cpp" />
+    <ClCompile Include="test.cpp" />
+    <ClCompile Include="thickmap.cpp" />
+    <ClCompile Include="utilities.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="tomo\fbp.cpp" />
+    <ClCompile Include="traceskeleton.cpp" />
+    <ClCompile Include="traceskeletonpoints.cpp" />
+    <ClCompile Include="transform.cpp" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{0016FE37-4BCD-44DC-A6EC-0470999ECCE6}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>itl2</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(CUDA_PATH)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(CUDA_PATH)\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration);$(SolutionDir)dep\lpng1647\projects\vstudio\x64\Release Library;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff\Release;$(SolutionDir)dep\jpeg-9f\Release\x64;$(SolutionDir)dep\c-blosc-1.21.6\blosc\Release</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration);$(SolutionDir)dep\lpng1647\projects\vstudio\x64\Release Library;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff\Release;$(SolutionDir)dep\jpeg-9f\Release\x64;$(SolutionDir)dep\c-blosc-1.21.6\blosc\Release</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(CUDA_PATH)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(CUDA_PATH)\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration);$(SolutionDir)dep\lpng1647\projects\vstudio\x64\Release Library;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff\Release;$(SolutionDir)dep\jpeg-9f\Release\x64;$(SolutionDir)dep\c-blosc-1.21.6\blosc\Release</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)itl2;$(SolutionDir)dep\lpng1647;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff;$(SolutionDir)dep\jpeg-9f;$(SolutionDir)dep\c-blosc-1.21.6\blosc</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)x64\$(Configuration);$(SolutionDir)dep\lpng1647\projects\vstudio\x64\Release Library;$(SolutionDir)dep\fftw-3.3.5-dll64;$(SolutionDir)dep\tiff-4.7.0\libtiff\Release;$(SolutionDir)dep\jpeg-9f\Release\x64;$(SolutionDir)dep\c-blosc-1.21.6\blosc\Release</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>opencl.lib;libfftw3f-3.lib;tiff.lib;jpeg.lib;libblosc.lib;libpng16.lib;</AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug no OpenCL|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>NO_OPENCL;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>libfftw3f-3.lib;tiff.lib;jpeg.lib;libblosc.lib;libpng16.lib;</AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>opencl.lib;libfftw3f-3.lib;tiff.lib;jpeg.lib;libblosc.lib;libpng16.lib;</AdditionalDependencies>
+      <Verbose>false</Verbose>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release no OpenCL|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NO_OPENCL;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>libfftw3f-3.lib;tiff.lib;jpeg.lib;libblosc.lib;libpng16.lib;</AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

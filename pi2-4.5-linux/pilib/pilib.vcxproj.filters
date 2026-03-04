@@ -1,0 +1,327 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="argumentdatatype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="command.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="commandargument.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="commandmacros.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="commandsbase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="distributable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="distributedimage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="distributor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="exeutils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="filtercommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="iocommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="localdistributor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="othercommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="overlapdistributable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parseexception.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pilib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pisystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pointprocesscommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pstream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slurmdistributor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="specialcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="thinandskeletoncommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="transformcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="trivialdistributable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pilibutilities.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="particlescommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="generationcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tomocommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="jobtype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="projectioncommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="delayed.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="commandlist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dmapcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="convertcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="histogramcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="thickmapcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="helpformat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="standardhelp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="whereami.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="whereamicpp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="maximacommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="carpetcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="structurecommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="distributedtempimage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="autothresholdcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="infocommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="metadatacommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pathcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="evalcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lsfdistributor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="distributecommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inpaintcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="distributedimagestoragetype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="timing.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="floodfillcommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="valueobject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parsedargtype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="command.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="distributable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="distributedimage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="distributor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="exeutils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="filtercommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="iocommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="localdistributor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="othercommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pilib.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pisystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pointprocesscommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slurmdistributor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="specialcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="thinandskeletoncommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="transformcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pilibutilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="particlescommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="generationcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tomocommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="projectioncommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="delayed.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="commandlist.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dmapcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="convertcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="histogramcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="thickmapcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="argumentdatatype.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="commandargument.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="whereami.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="maximacommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="carpetcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="structurecommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="autothresholdcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="infocommand.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pathcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="metadatacommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="evalcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lsfdistributor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="distributecommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="inpaintcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="timing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="floodfillcommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\itl2\interpolation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

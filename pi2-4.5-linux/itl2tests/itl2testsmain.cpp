@@ -1,0 +1,348 @@
+
+#include "math/numberutils.h"
+#include "math/matrix.h"
+#include "test.h"
+#include "raytrace.h"
+#include "io/vol.h"
+#include "utilities.h"
+#include "danielsson.h"
+#include "io/io.h"
+#include "io/itltiff.h"
+#include "io/nrrd.h"
+#include "io/pcr.h"
+#include "io/itldicom.h"
+#include "sphere.h"
+#include "testutils.h"
+#include "io/itlpng.h"
+#include "io/itljpeg.h"
+#include "neighbourhood.h"
+#include "misc.h"
+#include "filters.h"
+#include "transform.h"
+#include "registration.h"
+#include "stitching.h"
+#include "histogram.h"
+#include "floodfill.h"
+#include "lineskeleton.h"
+#include "surfaceskeleton.h"
+#include "surfaceskeleton2.h"
+#include "traceskeleton.h"
+#include "structure.h"
+#include "particleanalysis.h"
+#include "regionremoval.h"
+#include "fastbilateralfilter.h"
+#include "minhash.h"
+#include "tomo/fbp.h"
+#include "thickmap.h"
+#include "fillskeleton.h"
+#include "surfacecurvature.h"
+#include "autothreshold.h"
+#include "traceskeletonpoints.h"
+#include "generation.h"
+#include "noise.h"
+#include "maxima.h"
+#include "carpet.h"
+#include "montage.h"
+#include "math/conjugategradient.h"
+#include "tomo/siddonprojections.h"
+#include "iteration.h"
+#include "progress.h"
+#include "imagemetadata.h"
+#include "csa.h"
+#include "pathopening.h"
+#include "eval.h"
+#include "sdmap.h"
+#include "io/itllz4.h"
+#include "interpolation.h"
+
+using namespace itl2;
+using namespace std;
+
+int main()
+{
+	cout << "Host name: " << getHostname() << endl;
+
+	//test(itl2::tests::escapes, "Escape sequences");
+
+	//test(itl2::io::tests::badnn5, "reading bad nn5");
+
+	//test(itl2::tests::progress, "progress indicator");
+	//test(itl2::tests::invalidValueInterpolation, "invalid value interpolation");
+	//test(itl2::tests::intermediateTypes, "intermediate type determination");
+	//test(itl2::tests::equals, "equals");
+	//test(itl2::tests::saturatingArithmetic, "saturating arithmetic");
+	//test(itl2::tests::matrix3x3, "3x3 matrix");
+	//test(itl2::tests::matrix, "Matrix");
+	//test(itl2::tests::solve, "Matrix inverse and solution of group of linear equations");
+	//test(itl2::tests::leastSquares, "Least squares solution");
+	//test(itl2::tests::conjugateGradient, "Conjugate gradient");
+	//test(itl2::tests::cgne, "CGNE");
+	//test(itl2::tests::image, "Image");
+
+	//test(raw::tests::parseDimensions, "Parse raw dimensions from file name");
+	//test(raw::tests::expandFilename, "Raw filename expansion");
+	//test(raw::tests::raw, "Raw reader");
+	//test(io::tests::readWrite, "IO read");
+	//test(raw::tests::writeBlock, "Block based raw reader & writer");
+	//test(raw::tests::writeBlockFast, "Optimized block based raw reader & writer");
+	//test(vol::tests::volio, ".vol input/output");
+	//test(itl2::png::tests::png, "Png read and write");
+	//test(itl2::jpeg::tests::jpeg, "Jpeg read");
+	//test(itl2::tiff::tests::readWrite, "Tiff read and write");
+	////test(itl2::tiff::tests::imageJLargeTiff, "ImageJ large Tiff");
+	//test(itl2::nrrd::tests::readWrite, "NRRD read and write");
+	//test(itl2::pcr::tests::read, "PCR read");
+	//test(itl2::dicom::tests::read, "DICOM read");
+	
+	//test(itl2::sequence::tests::singleImages, "Single images as sequences");
+	//test(itl2::sequence::tests::match, "Matching");
+	//test(itl2::sequence::tests::sequence, "Image sequence");
+	//test(itl2::sequence::tests::fileFormats, "Sequence file formats");
+	//test(itl2::sequence::tests::readWriteBlock, "Image sequence block");
+	//test(itl2::sequence::tests::readWriteBlockOptimization, "Image sequence block write optimization");
+	
+	//test(itl2::tests::siddonProject, "Siddon algorithm");
+	//test(itl2::tests::geometry, "Geometry");
+
+	//test(itl2::tests::neighbourhoodTools, "neighbourhood tools");
+	//test(itl2::tests::edges, "Set edges");
+	//test(itl2::tests::separableOptimization, "filtering with separable optimization");
+
+	//test(itl2::tests::gaussFilters, "Gaussian filters and derivatives");
+	//test(itl2::tests::projections, "projections");
+	//test(itl2::tests::fourierTransformPair, "Fourier transforms");
+	//test(itl2::tests::dctPair, "DCT");
+	//test(itl2::tests::bandpass, "Bandpass filtering");
+	//test(itl2::tests::projections2, "projections 2");
+	//test(itl2::tests::filters, "filtering");
+
+	//test(itl2::tests::broadcast, "Broadcasted point process");
+	//test(itl2::tests::bilateral, "bilateral filter");
+
+	//test(itl2::tests::scale, "scaling");
+	//test(itl2::tests::translate, "translation");
+	//test(itl2::tests::rot90, "90 deg rotations");
+	//test(itl2::tests::rotate, "rotations around general axes");
+	//test(itl2::tests::reslice, "reslice");
+	//test(itl2::tests::crop, "crop and reverse crop");
+
+	//test(itl2::tests::pointProcess, "point processes");
+	//test(itl2::tests::pointProcessComplex, "point processes on complex numbers");
+	//test(itl2::tests::byteOrder, "byte order swaps");
+
+
+	//test(itl2::tests::phaseCorrelation, "phase correlation");
+	//test(itl2::tests::modulo, "modulo function");
+	//test(itl2::tests::phaseCorrelation2, "phase correlation 2 (rotation)");
+	//test(itl2::tests::phaseCorrelationBoundary, "phase correlation boundary");
+
+	//test(itl2::tests::blockMatch1, "block match 1");
+	//test(itl2::tests::blockMatch2Match, "block match 2 (match)");
+	//test(itl2::tests::blockMatch2Pullback, "block match 2 (pullback)");
+	//test(itl2::tests::reverseDeformation, "reverse deformation");
+
+	//test(itl2::tests::inpaintNearest, "Inpainting");
+	//test(itl2::tests::inpaintGarcia, "Inpainting (Garcia)");
+	//test(itl2::tests::inpaintGarcia2, "Inpainting 2 (Garcia)");
+	//test(itl2::tests::dmap1, "Distance map");
+
+	//test(itl2::tests::buffers, "Disk mapped buffer");
+	//test(itl2::tests::histogramIntermediateType, "Intermediate types in histogram");
+	//test(itl2::tests::histogram, "Histogram");
+	//test(itl2::tests::histogram2d, "Bivariate histogram");
+
+	//test(itl2::tests::binning, "Binning");
+	//test(itl2::tests::genericTransform, "Generic geometric transform");
+
+	//test(itl2::tests::floodfill, "Flood fill");
+	//test(itl2::tests::floodfillSanityChecks, "sanity checks of flood fill implementations");
+	//test(itl2::tests::floodfillLeaks, "Flood fill leak tests");
+	//test(itl2::tests::floodfillThreading, "Flood fill multithreading");
+
+	//test(itl2::tests::mipMatch, "MIP Match");
+
+	//test(itl2::tests::hashPow, "hash pow function");
+	//test(itl2::tests::nbHash, "neighbourhood hash function");
+	//test(itl2::tests::minHash, "minHash function");
+
+	//test(itl2::tests::surfaceSkeleton, "Surface skeleton");
+	//test(itl2::experimental::tests::surfaceSkeleton2, "Hybrid skeleton 2");
+	//test(itl2::tests::lineSkeleton, "Line skeleton");
+
+	//test(itl2::tests::traceSkeleton, "trace skeleton");
+	//test(itl2::tests::traceSkeletonRealData, "trace skeleton (real data)");
+	//test(itl2::tests::networkio, "network I/O");
+	//test(itl2::tests::disconnections, "network connect, disconnect, degree, etc.");
+	//test(itl2::tests::disconnectStraightThroughPerformance, "network optimization performance");
+	//test(itl2::tests::pruning, "pruning");
+	//test(itl2::tests::lineLength, "line length calculation");
+	//test(itl2::tests::skeletonToPointsAndLines, "skeleton to point-line form");
+
+	//test(itl2::tests::structureTensor, "structure tensor");
+	//test(itl2::tests::lineFilter, "line filtering");
+	//test(itl2::tests::canny, "Canny edge detection");
+
+	//test(itl2::tests::normalizeZ, "Normalize Z");
+
+	//test(itl2::tests::analyzeParticlesSanity, "Analyze particles sanity checks");
+	//test(itl2::tests::analyzeParticlesSanity2, "Analyze particles sanity checks 2");
+	//test(itl2::tests::analyzeParticlesVolumeLimit, "Analyze particles volume limit");
+	//test(itl2::tests::analyzeParticlesThreading, "Analyze particles threading");
+	//test(itl2::tests::analyzeParticlesThreadingBig, "Analyze particles threading, big volumes"); // This is a long test
+
+	//test(itl2::tests::regionRemoval, "Region removal");
+
+	//test(itl2::tests::lineMax, "Line maximum");
+	//test(itl2::tests::lineMin, "Line minimum");
+	//test(itl2::tests::sphereMaxSpeed, "Sphere max filtering speed");
+
+	//test(itl2::tests::danielssonTableSpeedTest, "Danielsson lookup table calculation speed");
+	//test(itl2::tests::fullDanielssonTables, "Danielsson lookup table calculation and caching");
+	//test(itl2::tests::danielsson, "Danielsson algorithm for centers of locally maximal spheres");
+
+	//test(itl2::tests::scaleLabels, "label/binary image scaling");
+	//test(itl2::tests::fastBilateralSampling, "fast bilateral filtering (sampling approximation)");
+
+	//test(itl2::tests::growPriority, "Meyer's growing algorithm");
+	//test(itl2::tests::growAll, "region growing");
+	//test(itl2::tests::growComparison, "region growing algorithm comparison");
+	//test(itl2::tests::growCustomHeap, "region growing custom heap algorithm");
+
+
+	//test(itl2::tests::fillSkeleton, "skeleton filling");
+	//test(itl2::tests::vectorAngles, "calculation of angle between vectors");
+
+	//test(itl2::tests::surfaceCurvature, "surface curvature");
+
+	//test(itl2::tests::recSettings, "Rec settings");
+	//test(itl2::tests::paganin, "Paganin method");
+	
+	
+
+	test(itl2::tests::thickmapsEquality, "equality of different thickness map implementations");	
+	//test(itl2::tests::dimred2D, "dimensionality reduction approach to local thickness 2D");
+	//test(itl2::tests::dimred3D, "dimensionality reduction approach to local thickness 3D");
+	//test(itl2::tests::discretizedCircles, "inclusion of discretized circles");
+	//test(itl2::tests::indexItem, "RiStorageItem saving test");
+	//test(itl2::tests::readWriteRi, "saving of non-trivially copyable image"); 
+	//test(itl2::tests::testDataForFiji, "generate comparison dataset for Fiji implementation");
+	//test(itl2::tests::thickmapRounding, "Rounding before thickness map calculation");
+	//test(itl2::tests::thickmapScaling, "large thickness map test");
+
+	//test(itl2::tests::autothreshold, "automatic thresholding");
+	//test(itl2::tests::localThreshold, "local thresholding");
+	//test(itl2::tests::localMaxima, "local maxima search");
+
+	//test(itl2::tests::carpet, "surface finding");
+	//test(itl2::tests::ellipsoid, "drawing ellipsoids");
+
+	//test(itl2::tests::montage, "2D montage of 3D stack");
+
+	//test(itl2::tests::pathopening, "Path opening");
+	//test(itl2::tests::pathopening2d, "Path opening 2D");
+	//test(itl2::tests::csa, "Cross-section analysis");
+
+	//test(itl2::tests::imagemetadata, "image metadata");
+
+	//test(itl2::tests::pointsToDeformed, "points to deformed");
+	
+	//test(itl2::tests::cylindricalConversion, "cylindrical coordinates");
+
+	//test(itl2::tests::eval, "evaluation of string expressions");
+
+	//test(itl2::tests::seededDMap, "seeded distance map");
+
+	//test(itl2::tests::stddevuint16, "standard deviation, uint16");
+
+	//test(itl2::tests::sphereMaxApprox, "fast max filter approximation accuracy");
+	//test(itl2::tests::sphereMinApprox, "fast min filter approximation accuracy");
+
+	
+	//test(itl2::lz4::tests::lz4io, "LZ4");
+	//test(itl2::lz4::tests::lz4blockIo, "LZ4 block");
+
+	//test(itl2::zarr::tests::read, "Zarr read");
+	//test(itl2::zarr::tests::write, "Zarr write");
+	//test(itl2::zarr::tests::transpose, "zarr test transpose codec");
+	//test(itl2::zarr::tests::blosc, "zarr test blosc codec");
+	//test(itl2::zarr::tests::writeBlock, "zarr test writeBlock");
+	//test(itl2::zarr::tests::readBlock, "zarr test readBlock");
+	//test(itl2::zarr::tests::zarrMetadataEquals, "zarr test zarrMetadataEquals");
+	//test(itl2::zarr::tests::separator, "zarr test separator");
+	//test(itl2::zarr::tests::sharding, "zarr test sharding");
+	//test(itl2::zarr::tests::emptyChunks, "zarr test emptyChunks");
+	//test(itl2::zarr::tests::concurrency, "zarr test concurrency");
+
+	//test(itl2::nn5::tests::nn5io, "NN5 I/O");
+	//test(itl2::nn5::tests::nn5BlockIo, "NN5 block I/O");
+	//test(itl2::nn5::tests::concurrency, "NN5 concurrent I/O");
+	//test(itl2::nn5::tests::concurrencyLong, "NN5 concurrent I/O, long test");
+	
+	//test(itl2::tests::aabox, "AABox");
+
+
+
+
+	// Experimental tests - these are mostly work in progress and data for them is not available yet
+
+	//test(itl2::tests::createPlates, "Input geometry generation");
+	//test(itl2::tests::createMoreProjections, "Large number of projections");
+	//test(itl2::tests::fbp, "Filtered backprojection");
+	
+	
+	//test(itl2::tests::openCLBackProjection, "OpenCL filtered backprojection");
+	//test(itl2::tests::openCLBackProjectionRealBin2, "OpenCL filtered backprojection, real dataset, binning 2");
+	//test(itl2::tests::openCLBackProjectionRealBin1, "OpenCL filtered backprojection, real dataset, binning 1"); 
+
+
+	//test(itl2::tests::createProjection, "Single projection");
+	//test(itl2::tests::createProjections, "Projections");
+	//test(itl2::tests::createBackprojection, "Back-projection");
+	//test(itl2::tests::projectionConsistency, "Consistency");
+	//test(itl2::tests::create10Projections, "10 projections");
+	
+
+
+	//test(tomo::tests::cgneReconstruction1, "CGNE reconstruction");
+	//test(tomo::tests::create36ProjectionsSheppLogan, "Shepp-Logan");
+	//test(tomo::tests::cgneReconstruction2, "CGNE reconstruction (Shepp-Logan)");
+	//test(itl2::tests::simplifyRodSkeleton, "Simplification of rod skeleton");
+	//test(itl2::tests::simplifyRodSkeleton2, "Simplification of rod skeleton (real data)");
+
+
+	//try
+	//{
+	//	tests::thickmapScaling();
+	//}
+	//catch (ITLException& e)
+	//{
+	//	cout << e.message() << endl;
+	//}
+	//catch (std::bad_alloc& e)
+	//{
+	//	cout << "Error: Out of memory (" << e.what() << ")" << endl;
+
+	//	return 2;
+	//}
+	//catch (std::exception& e)
+	//{
+	//	cout << "Error: " << e.what() << endl;
+
+	//	return 3;
+	//}
+	//catch (...)
+	//{
+	//	cout << "Error: Unknown error" << endl;
+
+	//	return 4;
+	//}
+
+	
+
+	itl2::testReport();
+
+	//cout << "Press return to exit..." << endl;
+	//char dummy;
+	//cin.getline(&dummy, 1);
+	return 0;
+}
