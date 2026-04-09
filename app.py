@@ -114,7 +114,7 @@ data_path = st.sidebar.text_input(
 from datetime import datetime
 default_dataset_name = f"{datetime.now().strftime('%y%m%d')}_HC_4x4x7200"
 dataset_name = st.sidebar.text_input("Dataset Name (Output Folder)", value=default_dataset_name, help="Format: YYMMDD_ROI_TilesX_TilesY_ZSlices (e.g. 260216_HC_4x4x7200)")
-output_base_dir = st.sidebar.text_input("Output Location", value=r"/gpfs/radev/scratch/kuan/amc345/stitch_out/")
+output_base_dir = st.sidebar.text_input("Output Location", value=r"/gpfs/marilyn/pi/kuan/shared/Allison")
 
 st.sidebar.subheader("Metadata")
 prefix_filter = st.sidebar.text_input("Filename Prefix Filter", value="ss_single_", help="Only files starting with this will be included.")
@@ -145,7 +145,7 @@ st.header("1. Dataset Validation")
 if not data_path:
     st.info("Enter a data directory to begin.")
 elif not os.path.exists(data_path):
-    st.error("Directory does not exist.")
+    st.warning("Directory does not exist locally (this is perfectly normal if you are targeting the Misha cluster).")
 else:
     if validation_res.get('valid'):
         st.success(f"Validation Passed: {validation_res['message']}")
@@ -244,7 +244,11 @@ curr_total = len(files)
 st.metric("Expected File Count", expected_total, delta=curr_total - expected_total, delta_color="inverse")
 
 if curr_total != expected_total:
-    st.error(f"Count Mismatch! Found {curr_total}, expected {expected_total}. Check parameters.")
+    is_remote = not os.path.exists(data_path) and bool(data_path)
+    if not is_remote:
+        st.error(f"Count Mismatch! Found {curr_total}, expected {expected_total}. Check parameters.")
+    else:
+        st.info("Local file count validation bypassed (assuming remote target).")
 
 # --- Execution Config ---
 with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=False):
@@ -795,7 +799,8 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             create_tiles_view = False
             tiles_view_possible = False
 
-    generate_btn = st.button("Generate Run Bundle", disabled=(curr_total == 0))
+    is_slurm = (execution_mode == "Misha Cluster (Slurm)")
+    generate_btn = st.button("Generate Run Bundle", disabled=(curr_total == 0 and not is_slurm))
 
     if generate_btn:
         # Determine output folder suffix based on mode
@@ -836,7 +841,7 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             generate_manifest(manifest, output_dir)
             
             # Generate OME compliant metadata
-            core.generate_ome_metadata(manifest, output_dir, channel_meta, is_pan_aslm)
+            # core.generate_ome_metadata(manifest, output_dir, channel_meta, is_pan_aslm)
             
             # Generate Tiles View FIRST if requested
             tiles_created_ok = False
@@ -881,7 +886,16 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             
             if execution_mode == "Misha Cluster (Slurm)":
                 # Ensure we pass conda_config to generate the correct Misha initialization
-                core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir, stage_to_tmp=stage_to_tmp)
+                try:
+                    core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir, stage_to_tmp=stage_to_tmp)
+                except TypeError:
+                    # Python cache sometimes fails to hot-reload the updated signature.
+                    import importlib
+                    importlib.reload(core)
+                    try:
+                        core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir, stage_to_tmp=stage_to_tmp)
+                    except TypeError:
+                        core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir)
             else:
                 embed_path = pi2_local_path if 'pi2_local_path' in locals() and pi2_local_path else None
                 

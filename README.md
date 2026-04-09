@@ -1,153 +1,192 @@
-# Run Bundle Generator for pi2/NRStitcher
+# pan-aslm2neuroglancer — Run Bundle Generator
 
-This Streamlit application generates ready-to-execute "Run Bundles" for the [pi2/NRStitcher](https://github.com/abc/nrstitcher) pipeline. It simplifies the complex process of creating configuration files and execution scripts for both local workstations and Slurm-managed clusters (like Misha).
+A Streamlit GUI that generates ready-to-execute **Run Bundles** for stitching large pan-ASLM light-sheet datasets using [pi2/NRStitcher](https://github.com/arttumiettinen/pi2).
+
+Supports both **local workstations** (Windows / Mac / Linux) and the **Misha HPC Cluster** (Yale YCRC Slurm).
+
+---
 
 ## Features
 
-*   **Interactive Configuration**: Easily input dataset parameters (dimensions, overlap, voxel size) via a GUI.
-*   **Auto-Detection**: Automatically detects your dataset dimensions from file metadata.
-*   **Smart Script Generation**: Creates `run_local.bat` (Windows), `run_local.sh` (Linux/Mac), and `run_nrstitcher.sbatch` (Slurm) with intelligent backend detection.
-*   **Misha Cluster Optimization**: Automatically triggers the correct `module load` requirements, overrides OpenMP threads, and validates internal `pi2` libraries via `ldd`.
-*   **Tiles View**: (Optional) Creates a `tiles/` folder with symlinks, renaming your files to a structured format (`tile_{t}_z_{z}_c_{c}.tif`) expected by some viewers, without duplicating data.
-*   **Preview**: Visually inspect your tiles and verify coordinate mapping before generating.
-*   **Slurm Resource Recommendation**: Estimates required Partition, CPU, Memory, and Time based on your dataset size. Displays warnings for critical memory bounds (< 120GB) to prevent block chunk shrinking and performance loss.
+| Feature | Description |
+|---|---|
+| **Interactive Configuration** | Input dataset parameters (dimensions, overlap, voxel size, scan order) via a GUI |
+| **Remote-Safe Validation** | Validates local datasets while gracefully bypassing checks for remote Misha paths |
+| **Misha Cluster Optimization** | Generates Slurm `sbatch` scripts with correct `module load`, OpenMP thread pinning, and `ldd` pre-flight validation |
+| **YCRC Resource Estimation** | Recommends CPU, memory, partition and time based on dataset size; warns when memory < 120GB |
+| **Staging to `/tmp`** | Optionally stages data to local node `/tmp` for maximum I/O throughput (recommended by YCRC) |
+| **Tiles View** | Creates a `tiles/` folder with symlinks renaming files to `tile_{t}_z_{z}_c_{c}.tif` without duplicating data |
+| **QC Analytics** | Post-stitch warping diagnostics, intensity drift analysis, and gain correction tools |
+| **Preview** | Visually inspect tile grid coordinate mapping before committing |
+
+---
 
 ## Quick Start
 
-### 1. Get the Code & Stitcher
+### 1. Clone the Repo
 
-You'll need this UI application and the core stitcher (`pi2`).
-
-**A. The Run Bundle App (This UI)**
-Clone this repository to your machine:
 ```bash
-git clone https://github.com/allison714/nrstitcher-preprocessing.git
-cd nrstitcher-preprocessing
+git clone https://github.com/allison714/pan-aslm2neuroglancer.git
+cd pan-aslm2neuroglancer
 ```
 
-**B. The Core Stitcher (`pi2`)**
-*   **Windows (Recommended)**: Download the pre-compiled binary distribution (`pi2-v4.5-win-no-opencl`). The app automatically supports it if placed at `D:\pi2-v4.5-win-no-opencl` (or you can link it manually). You do NOT need to clone the pi2 repo.
-*   **Source Building**: If you must build from source, clone the `pi2` repo (`git clone https://github.com/arttumiettinen/pi2.git`).
+### 2. Launch the App
 
-### 2. Getting Started
+**Windows (Easiest)**
+```
+Double-click RUN_ME.bat
+```
+This auto-creates the `stitch_app` conda environment, installs dependencies, and opens the browser UI.
 
-There are two ways to start the application, depending on your operating system:
-
-**Option A: Windows (Easiest)**
-An automated batch script is provided that will automatically find your Conda installation, create the required `stitch_app` environment, install dependencies, and launch the UI.
-1. Simply double-click **`RUN_ME.bat`** in the project folder!
-
-**Option B: Mac / Linux (Manual Anaconda Prompt)**
-If you are on Mac/Linux, or prefer to set up the environment manually:
-1. Open your terminal (or **Anaconda Prompt**).
-2. Navigate to the downloaded project directory: `cd path/to/nrstitcher-preprocessing`
-3. Create and activate the conda environment, then install dependencies:
+**Mac / Linux (Manual)**
 ```bash
 conda create -n stitch_app python=3.9 -y
 conda activate stitch_app
 pip install -r requirements.txt
-```
-4. Run the application:
-```bash
 streamlit run app.py
 ```
 
-The application will open in your default web browser automatically.
+---
 
 ## Workflow
 
-1.  **Select Data**: Input your dimensional parameters, overlapping preferences, and physical resolutions.
-![Data Configuration](file:///C:/Users/allis/.gemini/antigravity/brain/a36c68f1-6232-4658-8d75-fabd2bf012b9/screenshot_inputs.png)
+### For Misha HPC (Recommended for large datasets > 100GB)
 
-2.  **Verify**: Use the **"Preview Tiles"** section to visually check if your coordinate mappings follow your intended scan path.
+This is the **offline configuration** model: generate the bundle locally, upload to Misha, and let the cluster do the heavy lifting.
 
-3.  **Configure Execution**:
-    *   **Target Environment**: Choose "Local Workstation" or "Misha Cluster (Slurm)".
-![Execution Setup](file:///C:/Users/allis/.gemini/antigravity/brain/a36c68f1-6232-4658-8d75-fabd2bf012b9/screenshot_tooltip.png)
-    *   **Backend config**: The app attempts to auto-detect `pi2` or `nrstitcher`. You can override this if needed.
+```
+[Local PC]                              [Misha HPC]
+  Streamlit App          Globus             sbatch
+  ─────────────   ─────────────────►   ─────────────►
+  Generate Bundle      Transfer              Stitch
+  (lightweight)      bundle folder        2.2TB output
+```
 
-4.  **Generate**: Click "Generate Run Bundle".
+**Step-by-step:**
 
-## Post-Generation Quality Control (QC)
+1. Open the app and select **"Misha Cluster (Slurm)"** as the Target Environment.
+2. Set paths to your data (Misha paths like `/gpfs/...` are accepted — local validation is skipped automatically).
+3. Configure Slurm resources (CPU, memory, partition). The app will recommend values based on your dataset size.
+4. Click **"Generate Run Bundle"**.
+5. Find the output folder (named `YYMMDD_slurm_nr_<dataset>`) on your local machine.
+6. Transfer it to Misha using [Globus](https://app.globus.org) → drop it in your target output directory on `/gpfs/...`.
+7. SSH into Misha:
+   ```bash
+   cd /path/to/your/transferred/bundle
+   sbatch run_nrstitcher.sbatch
+   ```
+8. Monitor progress:
+   ```bash
+   squeue -u <netid>           # Check job status (PD → R → done)
+   jobstats <JOBID>            # Live CPU/memory usage
+   tail -f *.out               # Live log output
+   seff <JOBID>                # Efficiency summary after completion
+   ```
 
-After generating and running your stitched bundle, point the application to your output directory to compute advanced quality control analytics.
+**Key paths for Misha (Yale WTI):**
 
-### Warping Diagnostics
-Identifies mechanical issues by isolating non-linear 3D spatial drags across tile boundaries. Pinpoints exact regions of problematic physical topologies using robust median density filters.
-![Warping Diagnostics](file:///C:/Users/allis/.gemini/antigravity/brain/a36c68f1-6232-4658-8d75-fabd2bf012b9/screenshot_warping.png)
+| Path | Purpose |
+|---|---|
+| `/gpfs/radev/scratch/kuan/amc345/raw/` | Raw input data (fast scratch) |
+| `/gpfs/marilyn/pi/kuan/shared/Allison/` | Output for stitched results (shared storage) |
+| `/gpfs/radev/scratch/kuan/amc345/pan-aslm2neuroglancer/pi2-4.5-linux/` | pi2 binary on Misha |
 
-### Intensity Drift Analysis
-Mathematically decouples baseline illumination decay and laser-power inconsistencies from actual physiological density measurements. This allows for safe, robust detection of photobleaching trajectories and automatically scaffolds a physical structural file rewrite (Gain Correction) if unacceptable attenuation is observed.
-![Drift Analysis](file:///C:/Users/allis/.gemini/antigravity/brain/a36c68f1-6232-4658-8d75-fabd2bf012b9/screenshot_drift.png)
+---
 
-## Output
+### For Local Workstations
 
-The app creates a new folder (e.g., `MyDataset_local` or `MyDataset_slurm`) containing:
+1. Select **"Local Workstation"** as Target Environment.
+2. Point the app to your local `pi2` binaries (auto-detected from `D:\pi2-v4.5-win-no-opencl` or `resources/pi2`).
+3. Click **"Generate Run Bundle"**.
+4. Navigate to the output folder and run:
+   - **Windows**: double-click `run_local.bat`
+   - **Linux/Mac**: `./run_local.sh`
 
-*   `stitch_settings.txt`: The coordinate configuration for the stitcher.
-*   `dataset_manifest.json`: A record of your settings for reproducibility.
-*   `run_local.bat` / `run_local.sh` / `run_nrstitcher.sbatch`: The specific script to **run the actual stitching**.
-*   `tiles/`: (Optional) The symlinked view of your data.
+---
 
-## Local Workstation Execution
+## Output Bundle Contents
 
-### Prerequisite: `pi2` / `nrstitcher`
-For local stitching, you need the `pi2` software. Since this is not a public PyPI package, you have two options:
+| File | Description |
+|---|---|
+| `stitch_settings.txt` | pi2/NRStitcher tile coordinate configuration |
+| `dataset_manifest.json` | Full parameter record for reproducibility |
+| `run_nrstitcher.sbatch` | Slurm job submission script (Misha) |
+| `run_local.bat` / `run_local.sh` | Local execution scripts (Windows/Mac/Linux) |
+| `stack_tiles.py` | Pre-processing: stacks 2D z-slices into 3D tile volumes |
+| `convert_to_neuroglancer.py` | Post-processing: converts output to Neuroglancer Precomputed |
+| `serve.py` | Local web server for Neuroglancer visualization |
 
-1.  **Portable Bundle (Recommended)**: 
-    *   Download the [pi2 source code](https://github.com/arttumiettinen/pi2).
-    *   In the App, under **Local Config**, paste the path to your `pi2` folder in **"Path to 'pi2' Package Source"**.
-    *   The App will **embed** a copy of `pi2` into the run bundle (`tools/pi2`).
-    *   The generated script will automatically use this embedded copy, meaning you don't need to install it in your environment!
-
-2.  **Auto-Download from GitHub**:
-    *   If you leave the "Path to 'pi2'" blank, the generated script will attempt to:
-        1.  Create a fresh Conda environment (`stitch_app`) if it doesn't exist.
-        2.  Install dependencies (`numpy`, `tifffile`, `scikit-image`).
-        3.  Run `pip install git+https://github.com/arttumiettinen/pi2`.
-    *   **Requires**: `git` must be installed and available in your command prompt.
-
-### Running the Stitcher
-1.  Navigate to the generated bundle folder.
-2.  Double-click **`run_local.bat`** (Windows) or run `./run_local.sh` (Linux/Mac).
-3.  The script will:
-    *   Activate the `stitch_app` environment.
-    *   Run the stitch command.
-    *   (Optional) Convert the output to Neuroglancer Precomputed format if selected.
+---
 
 ## Neuroglancer Visualization
-If you selected **Neuroglancer Precomputed** output, you can instantly view your 3D stitched volume in your browser:
 
-1. Open **Anaconda Prompt**.
-2. Navigate to your stitched output folder (e.g., `cd D:\StitchScratch\260224_local...`).
-3. Run the included server script:
-   ```bash
-   python serve.py
-   ```
-4. Open Chrome and go to [neuroglancer-demo.appspot.com](https://neuroglancer-demo.appspot.com/).
-5. Click the `+` icon in the top left and add your local Source: `precomputed://http://localhost:8000/precomputed`.
+After stitching completes, view the 3D volume in your browser:
 
-## Output
-The app creates a new folder containing:
-*   `stitch_settings.txt`: Configuration file.
-*   `dataset_manifest.json`: JSON record of settings.
-*   `run_local.bat` / `run_local.sh`: Intelligent execution scripts.
-*   `serve.py`: Local web server for Neuroglancer visualization.
-*   `tools/`: (If using Portable Bundle) Contains the embedded `pi2` package.
+```bash
+# From within the bundle folder (with output present)
+python serve.py
+```
+
+Then open [neuroglancer-demo.appspot.com](https://neuroglancer-demo.appspot.com/) and add:
+```
+precomputed://http://localhost:8000/precomputed
+```
+
+---
+
+## Misha Slurm Script Details
+
+The generated `run_nrstitcher.sbatch` includes:
+
+```bash
+# Loads required modules
+module load miniconda/24.3.0
+module load FFTW/3.3.10-GCC-13.3.0
+module load libpng/1.6.43-GCCcore-13.3.0
+module load LibTIFF/4.6.0-GCCcore-13.3.0
+module load Blosc/1.21.6-GCCcore-13.3.0
+
+# Pins OpenMP threads to allocated CPUs (prevents oversubscription)
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+# Optional: stage to local /tmp for faster I/O (recommended by YCRC)
+rsync -a . $SCRATCH && cd $SCRATCH
+```
+
+---
 
 ## Troubleshooting
 
-### Auto-Install Failed
-*   **Error**: `pip install git+... failed`
-*   **Cause**: You likely don't have `git` installed, or you are behind a firewall.
-*   **Fix**: Download `pi2` manually from GitHub, extract it, and use the **"Path to 'pi2' Package Source"** field in the App to create a Portable Bundle instead.
+**"Generate Run Bundle" button is greyed out (Misha mode)**
+→ Expected. The app skips local file validation when Misha Cluster is selected. Make sure the Execution Configuration expander is open and `Misha Cluster (Slurm)` is selected.
 
-### "Conda not found"
-*   The script tries to find `conda` automatically. If it fails, open the App and check **"Local Config > Conda Init Script"**. Ensure it points to your actual `conda.bat` (usually `C:\Users\Username\anaconda3\condabin\conda.bat`).
+**"str object has no attribute 'get'"**
+→ This was caused by a duplicate `generate_slurm_script` definition in `core.py` that had swapped parameter order. Fixed in current version.
 
-## Exporting this README to PDF
-If you use Visual Studio Code and wish to save this documentation as a PDF, you can automate it using the `Markdown PDF` extension:
-1. Install the `Markdown PDF` extension by *yzane*.
-2. Add the `"markdown-pdf.convertOnSave": true` option to your VS Code `settings.json`.
-3. Restart Visual Studio Code.
-4. Open this Markdown file and save it (Ctrl+S / Cmd+S). The PDF will auto-generate in the same folder.
+**"generate_slurm_script() got an unexpected keyword argument 'stage_to_tmp'"**
+→ Caused by Python loading a stale cached module. Fixed by forcing `importlib.reload(core)` at call time.
+
+**"Conda not found"**
+→ Open the app → Backend Configuration → update the "Conda Init Script" to your actual `conda.sh` path.
+
+**"ldd not found" pre-flight errors on Misha**
+→ The pre-flight now correctly runs `ldd` on the `pi2` ELF binary, not the `.py` script.
+
+---
+
+## Project Structure
+
+```
+pan-aslm2neuroglancer/
+├── app.py                    # Main Streamlit application
+├── src/
+│   └── core.py               # Bundle generation logic (stitch settings, Slurm, local scripts)
+├── RUN_ME.bat                # Windows one-click launcher
+├── requirements.txt          # Python dependencies
+├── pi2-4.5-linux/            # pi2 Linux binary (for Misha use)
+└── pi2-v4.5-win-no-opencl/   # pi2 Windows binary (for local use)
+```
+
+---
+
+*A. Cairns || 2026 — Kuan × Bewersdorf Labs, Yale University*
