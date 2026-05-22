@@ -69,7 +69,7 @@ echo "Running pi2 / NRStitcher..."
 echo "Done"
 date
 """
-    with open(os.path.join(output_dir, "run_local.sh"), 'w') as f:
+    with open(os.path.join(output_dir, "run_local.sh"), 'w', newline='\n') as f:
         f.write(sh_content)
         # Make executable
         try:
@@ -395,91 +395,182 @@ def generate_stitch_settings(manifest: DatasetManifest, output_dir: str, data_pa
         with open(os.path.join(output_dir, "stitch_settings_rigid_preview.txt"), 'w') as f:
             f.write(preview_content)
 
-def generate_slurm_script(manifest: DatasetManifest, slurm_params: Dict, conda_config: Dict, output_dir: str, stage_to_tmp: bool = False):
-    """
-    Generates run_nrstitcher.sbatch targeting pi2/NRStitcher on Misha.
-    Enforces YCRC rules (explicit memory, sensible partitions).
-    """
-    
-    staging_block = ""
-    cleanup_block = ""
-    run_dir = ""
-    
-    if stage_to_tmp:
-        staging_block = """
+# NOTE: do NOT include miniconda here. The miniconda module prepends its base
+# bin/ to PATH and that wins over `conda activate <env>`, leaving CONDA_DEFAULT_ENV
+# set correctly but `python` resolving to base miniconda (no env packages). Conda
+# is sourced directly from conda.sh below — the module is redundant and harmful.
+_MISHA_MODULES = [
+    "FFTW/3.3.10-GCC-13.3.0",
+    "libpng/1.6.43-GCCcore-13.3.0",
+    "LibTIFF/4.6.0-GCCcore-13.3.0",
+    "Blosc/1.21.6-GCCcore-13.3.0",
+]
+
+_MISHA_CONDA_INIT = "/gpfs/radev/apps/avx512/software/miniconda/24.3.0-miniforge/etc/profile.d/conda.sh"
+
+_STAGING_BLOCK = """\
 echo "=== STAGING TO LOCAL /tmp ==="
-SCRATCH=/tmp/$SLURM_JOB_ID
-mkdir -p $SCRATCH
+SCRATCH="/tmp/$SLURM_JOB_ID"
+mkdir -p "$SCRATCH"
+cleanup_staging() {
+    echo "=== COPYING OUTPUTS BACK ==="
+    rsync -a --exclude='*.out' --exclude='*.err' "$SCRATCH"/ "$SLURM_SUBMIT_DIR"/ || true
+    rm -rf "$SCRATCH"
+}
+trap cleanup_staging EXIT
 echo "Rsyncing current directory to $SCRATCH..."
-rsync -a . $SCRATCH/
-cd $SCRATCH
+rsync -a ./ "$SCRATCH"/
+cd "$SCRATCH\""""
+
+_RESOLVE_STITCHER_BLOCK = """\
+# --- Resolve Stitcher Command ---
+STITCH_CMD=""
+if [ -n "$USER_ENTRYPOINT" ]; then
+    case "$USER_ENTRYPOINT" in
+        *.py) STITCH_CMD="python $USER_ENTRYPOINT" ;;
+        *)    STITCH_CMD="$USER_ENTRYPOINT" ;;
+    esac
+elif command -v nrstitcher &> /dev/null; then
+    STITCH_CMD="nrstitcher"
+elif command -v pi2 &> /dev/null; then
+    STITCH_CMD="pi2 stitch"
+elif python -m pi2.stitch -h &> /dev/null; then
+    STITCH_CMD="python -m pi2.stitch"
+else
+    echo "[ERROR] No stitcher found. Set 'Entrypoint Override' to a binary on PATH or a full path to nr_stitcher.py." >&2
+    exit 1
+fi
+echo "Using stitcher: $STITCH_CMD"\
 """
-        cleanup_block = """
-echo "=== COPYING OUTPUTS BACK ==="
-rsync -a * $SLURM_SUBMIT_DIR/
-echo "Cleaning up $SCRATCH..."
-rm -rf $SCRATCH
-cd $SLURM_SUBMIT_DIR
-"""
 
-    script = f"""#!/bin/bash
-#SBATCH --job-name={manifest.dataset_name}_stitch
-#SBATCH --partition={slurm_params.get('partition', 'day')}
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task={slurm_params.get('cpus', 8)}
-#SBATCH --mem={slurm_params.get('mem', '64G')}
-#SBATCH --time={slurm_params.get('time', '04:00:00')}
-#SBATCH --output=%x_%j.out
-#SBATCH --error=%x_%j.err
-
-echo "Starting stitching job for {manifest.dataset_name}"
-date
-
-# Load Misha Modules for pi2
-module load miniconda/24.3.0
-module load FFTW/3.3.10-GCC-13.3.0
-module load libpng/1.6.43-GCCcore-13.3.0
-module load LibTIFF/4.6.0-GCCcore-13.3.0
-module load Blosc/1.21.6-GCCcore-13.3.0
-
-# Initialize Conda (Misha Default)
-source /gpfs/radev/apps/avx512/software/miniconda/24.3.0-miniforge/etc/profile.d/conda.sh
-conda activate {conda_config.get('env_name', 'pi2_env')}
-
-# Explicitly assign OpenMP threads to Slurm task CPUs
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-
-{staging_block}
-
+_PREFLIGHT_BLOCK = """\
 # --- Pre-Flight Check ---
-echo "Validating pi2 binary dependencies..."
-STITCH_CMD="{conda_config.get('entrypoint', 'pi2')}"
-if ldd $STITCH_CMD | grep "not found"; then
-    echo "[ERROR] Missing shared libraries for pi2 binary! Job aborted."
+FIRST_TOK="${STITCH_CMD%% *}"
+if [ "$FIRST_TOK" != "python" ]; then
+    RESOLVED="$(command -v "$FIRST_TOK" 2>/dev/null || true)"
+    if [ -z "$RESOLVED" ]; then
+        echo "[ERROR] '$FIRST_TOK' not found on PATH." >&2
+        exit 1
+    fi
+    if ldd "$RESOLVED" 2>&1 | grep -q "not found"; then
+        echo "[ERROR] Missing shared libraries for $RESOLVED:" >&2
+        ldd "$RESOLVED" | grep "not found" >&2
+        exit 1
+    fi
+fi
+echo "Stitcher validation passed."\
+"""
+
+_ENV_VERIFY_BLOCK = """\
+# Verify conda activate actually moved python into the env. PATH ordering
+# from `module load` can otherwise leave CONDA_DEFAULT_ENV set but python
+# still pointing at the module's base interpreter — fail loud instead of
+# later as a misleading ModuleNotFoundError.
+EXPECTED_PYTHON="${CONDA_PREFIX:-}/bin/python"
+ACTUAL_PYTHON="$(command -v python || true)"
+if [ -z "${CONDA_PREFIX:-}" ] || [ "$ACTUAL_PYTHON" != "$EXPECTED_PYTHON" ]; then
+    echo "[ERROR] conda env did not activate cleanly." >&2
+    echo "        CONDA_DEFAULT_ENV='${CONDA_DEFAULT_ENV:-}' CONDA_PREFIX='${CONDA_PREFIX:-}'" >&2
+    echo "        python is at '$ACTUAL_PYTHON', expected '$EXPECTED_PYTHON'" >&2
     exit 1
 fi
+echo "Conda env OK: $EXPECTED_PYTHON"\
+"""
 
-if ! $STITCH_CMD help &> /dev/null; then
-    echo "[ERROR] pi2 engine failed to initialize (run 'pi2 help' locally to debug). Job aborted."
+_STACKING_BLOCK = """\
+# --- Preprocess: 2D z-slices -> 3D per-tile stacks ---
+# stack_tiles.py is idempotent (skips already-written tile_NNN.tif), so safe
+# to re-run on requeued jobs.
+if [ ! -f stack_tiles.py ]; then
+    echo "[ERROR] stack_tiles.py not found in $(pwd). Bundle is incomplete." >&2
     exit 1
 fi
-echo "pi2 validation passed."
-
-# --- Execute ---
-echo "Running pi2 / NRStitcher..."
-python $STITCH_CMD stitch_settings.txt
-{cleanup_block}
-echo "Done"
+echo "Stacking 2D z-slices into per-tile 3D volumes..."
 date
+python stack_tiles.py
+echo "Stacking complete."
+date"""
 
+_MONITORING_FOOTER = """\
 # --- Monitoring Instructions ---
 # To monitor this job while running:
 #   jobstats $SLURM_JOB_ID
 # To view memory/efficiency after completion:
 #   seff $SLURM_JOB_ID
-#   sacct -j $SLURM_JOB_ID --format=JobID,State,ExitCode,Elapsed,MaxRSS,AllocTRES
-"""
-    with open(os.path.join(output_dir, "run_nrstitcher.sbatch"), 'w') as f:
+#   sacct -j $SLURM_JOB_ID --format=JobID,State,ExitCode,Elapsed,MaxRSS,AllocTRES"""
+
+
+def generate_slurm_script(manifest: DatasetManifest, slurm_params: Dict, conda_config: Dict, output_dir: str, stage_to_tmp: bool = False, run_stacking: bool = True):
+    """
+    Generates run_nrstitcher.sbatch targeting pi2/NRStitcher on Misha.
+    Enforces YCRC rules (explicit memory, sensible partitions).
+
+    run_stacking=True (default) chains `python stack_tiles.py` before the stitcher,
+    matching the pan-ASLM pipeline where 2D z-slices need to be assembled into
+    per-tile 3D TIFFs first. Set False if a workflow ships pre-stacked tiles.
+    """
+    env_name = conda_config.get('env_name', 'pi2_env')
+    entrypoint = (conda_config.get('entrypoint') or '').strip()
+
+    lines = [
+        "#!/bin/bash",
+        f"#SBATCH --job-name={manifest.dataset_name}_stitch",
+        f"#SBATCH --partition={slurm_params.get('partition', 'day')}",
+        "#SBATCH --ntasks=1",
+        f"#SBATCH --cpus-per-task={slurm_params.get('cpus', 8)}",
+        f"#SBATCH --mem={slurm_params.get('mem', '64G')}",
+        f"#SBATCH --time={slurm_params.get('time', '04:00:00')}",
+        "#SBATCH --output=%x_%j.out",
+        "#SBATCH --error=%x_%j.err",
+        "",
+        "set -eo pipefail",
+        "",
+        f'echo "Starting stitching job for {manifest.dataset_name}"',
+        "date",
+        "",
+        "# Load Misha Modules for pi2",
+    ]
+    lines += [f"module load {m}" for m in _MISHA_MODULES]
+    lines += [
+        "",
+        "# Initialize Conda (Misha Default)",
+        "set +e  # conda init scripts can return nonzero on idempotent calls",
+        f"source {_MISHA_CONDA_INIT}",
+        f"conda activate {env_name}",
+        "set -e",
+        "",
+        _ENV_VERIFY_BLOCK,
+        "",
+        "# Explicitly assign OpenMP threads to Slurm task CPUs",
+        'export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"',
+        "",
+        f'USER_ENTRYPOINT="{entrypoint}"',
+        "",
+    ]
+    if stage_to_tmp:
+        lines += [_STAGING_BLOCK, ""]
+    lines += [
+        _RESOLVE_STITCHER_BLOCK,
+        "",
+        _PREFLIGHT_BLOCK,
+        "",
+    ]
+    if run_stacking:
+        lines += [_STACKING_BLOCK, ""]
+    lines += [
+        "# --- Execute ---",
+        'echo "Running pi2 / NRStitcher..."',
+        "$STITCH_CMD stitch_settings.txt",
+        "",
+        'echo "Done"',
+        "date",
+        "",
+        _MONITORING_FOOTER,
+        "",
+    ]
+
+    script = "\n".join(lines)
+    with open(os.path.join(output_dir, "run_nrstitcher.sbatch"), 'w', newline='\n') as f:
         f.write(script)
 
 def generate_manifest(manifest: DatasetManifest, output_dir: str):
@@ -1076,7 +1167,7 @@ echo "  ALL DONE"
 echo "============================================================"
 date
 """
-    with open(os.path.join(output_dir, "run_local.sh"), 'w') as f:
+    with open(os.path.join(output_dir, "run_local.sh"), 'w', newline='\n') as f:
         f.write(sh_content)
         try:
             os.chmod(os.path.join(output_dir, "run_local.sh"), 0o755)
@@ -1466,10 +1557,15 @@ def generate_neuroglancer_converter(manifest: DatasetManifest, output_dir: str, 
 """
 Convert NRStitcher raw output to Neuroglancer Precomputed.
 Generated by the NRStitcher Run Bundle Generator.
+
+Required:  pip install tensorstore
+Optional:  pip install cloud-volume igneous-pipeline task-queue
+           (without these, MIP pyramid is skipped and the volume only renders at base resolution in Neuroglancer)
 """
 import os
 import sys
 import glob
+import time
 import numpy as np
 import json
 
@@ -1569,7 +1665,9 @@ def main():
     
     dtype = 'uint8' if BIT_DEPTH == 8 else 'uint16'
     
-    # Define Neuroglancer Precomputed target
+    # Define Neuroglancer Precomputed target.
+    # Sharding packs ~thousands of chunks per shard file so we don't drop millions
+    # of tiny files onto GPFS metadata. Required for any large volume on a shared FS.
     output_path = "precomputed"
     target_spec = {{
         'driver': 'neuroglancer_precomputed',
@@ -1584,29 +1682,79 @@ def main():
         }},
         'scale_metadata': {{
             'size': [nx, ny, nz],
-            'encoding': 'raw', # or 'compressed_segmentation' / 'jpeg'
+            'encoding': 'raw',
             'chunk_size': [128, 128, 128],
             'resolution': [VOXEL_X_NM, VOXEL_Y_NM, VOXEL_Z_NM],
+            'sharding': {{
+                '@type': 'neuroglancer_uint64_sharded_v1',
+                'preshift_bits': 9,
+                'minishard_bits': 6,
+                'shard_bits': 15,
+                'hash': 'identity',
+                'minishard_index_encoding': 'gzip',
+                'data_encoding': 'gzip',
+            }},
         }},
     }}
 
     print(f"Creating/Opening target precomputed: {{output_path}}")
     dataset = ts.open(target_spec, create=True, delete_existing=True).result()
-    
+
     print(f"Opening source raw via memory map: {{raw_path}}")
     # pi2 writes flat binary in Z, Y, X order (C-contiguous)
     vol_zyx = np.memmap(raw_path, dtype=dtype, mode='r', shape=(nz, ny, nx))
-    
-    # TensorStore neuroglancer_precomputed expects (x, y, z, channel)
-    vol_xyz = vol_zyx.transpose(2, 1, 0)
-    vol_xyzc = np.expand_dims(vol_xyz, axis=3)
-    
-    print("Writing data in chunks (this may take a while)...")
-    # TensorStore reads from the memmap chunks sequentially
-    dataset.write(vol_xyzc).result()
-    
-    print(f"Success! Neuroglancer Precomputed output at: {{os.path.abspath(output_path)}}")
-    print("You can view this by serving the folder with a CORS-enabled web server.")
+
+    # Write in Z-aligned blocks of CHUNK_Z so memory stays bounded and we see progress.
+    # Each block is read from the memmap, transposed (Z,Y,X)->(X,Y,Z), written into the
+    # corresponding z-slab of the precomputed dataset.
+    CHUNK_Z = 128
+    n_blocks = (nz + CHUNK_Z - 1) // CHUNK_Z
+    print(f"Writing {{nx}}x{{ny}}x{{nz}} as {{n_blocks}} z-blocks of {{CHUNK_Z}}...")
+    t0 = time.time()
+    for i, z_start in enumerate(range(0, nz, CHUNK_Z)):
+        z_end = min(z_start + CHUNK_Z, nz)
+        block_zyx = np.asarray(vol_zyx[z_start:z_end])     # forces memmap read of just this slab
+        block_xyzc = block_zyx.transpose(2, 1, 0)[..., None]
+        dataset[:, :, z_start:z_end, :].write(block_xyzc).result()
+        elapsed = time.time() - t0
+        eta = elapsed / (i + 1) * (n_blocks - i - 1)
+        print(f"  z-block {{i+1:4d}}/{{n_blocks}} ({{z_start:5d}}-{{z_end:5d}})  elapsed {{elapsed:7.0f}}s  eta {{eta:7.0f}}s")
+
+    print(f"Base resolution write complete at: {{os.path.abspath(output_path)}}")
+
+    # Build MIP pyramid via igneous so Neuroglancer can render zoomed-out views.
+    # Without this, the browser has to fetch full-resolution chunks for any overview.
+    try:
+        import igneous.task_creation as tc
+        from taskqueue import LocalTaskQueue
+    except ImportError:
+        print()
+        print("[WARN] igneous-pipeline / task-queue not installed; SKIPPING MIP pyramid.")
+        print("       Neuroglancer will only have the base resolution available.")
+        print("       To build the pyramid later: pip install cloud-volume igneous-pipeline task-queue")
+        print("       then re-run this script with --mips-only, or run igneous directly.")
+        return
+
+    cv_path = f"file://{{os.path.abspath(output_path)}}"
+    print(f"Building MIP pyramid via igneous on {{cv_path}}...")
+    NUM_MIPS = 5
+    DOWNSAMPLE_FACTOR = (2, 2, 2)  # isotropic-ish voxel -> downsample equally in xyz
+    tq = LocalTaskQueue(parallel=min(8, os.cpu_count() or 1))
+    tasks = tc.create_downsampling_tasks(
+        cv_path,
+        mip=0,
+        num_mips=NUM_MIPS,
+        sparse=False,
+        compress='gzip',
+        factor=DOWNSAMPLE_FACTOR,
+    )
+    tq.insert(tasks)
+    tq.execute()
+    print(f"Built {{NUM_MIPS}} MIP level(s) with factor {{DOWNSAMPLE_FACTOR}}.")
+
+    print()
+    print(f"DONE. Precomputed volume at: {{os.path.abspath(output_path)}}")
+    print("Serve it with `python serve.py` and load `precomputed://http://localhost:8000/precomputed` in Neuroglancer.")
 
 if __name__ == "__main__":
     main()

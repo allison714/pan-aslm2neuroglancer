@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Claude Code workspace state (per-machine)
+.claude/
+
+# Generated per-run bundle directories (YYMMDD_slurm_nr_<dataset>/)
+*_slurm_nr_*/
+
+# Smoke / scratch bundles
+smoke_test_bundle/
+
+# Per-run helper scripts (hardcoded to a specific bundle; not for sharing)
+push_converter.ps1
+push_convert_sbatch.ps1
+regen_converter.py
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
