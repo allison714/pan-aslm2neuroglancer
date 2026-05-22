@@ -1704,12 +1704,21 @@ def main():
     # pi2 writes flat binary in Z, Y, X order (C-contiguous)
     vol_zyx = np.memmap(raw_path, dtype=dtype, mode='r', shape=(nz, ny, nx))
 
-    # Write in Z-aligned blocks of CHUNK_Z so memory stays bounded and we see progress.
-    # Each block is read from the memmap, transposed (Z,Y,X)->(X,Y,Z), written into the
-    # corresponding z-slab of the precomputed dataset.
-    CHUNK_Z = 128
+    # Force line-buffered stdout so Slurm .out captures progress in near-real-time.
+    # Without this Python aggressively buffers under non-TTY and the .out stays empty for hours.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
+
+    # Write in Z-aligned blocks of CHUNK_Z so memory stays bounded.
+    # Each block: CHUNK_Z * ny * nx * 2 bytes (uint16). tensorstore's write needs a
+    # contiguous copy of the transposed block plus a compression buffer, so peak
+    # memory is ~3x the block size. CHUNK_Z=32 at 11400^2 ~= 8 GB block, ~24 GB peak,
+    # comfortable under a 64 GB sbatch ceiling.
+    CHUNK_Z = 32
     n_blocks = (nz + CHUNK_Z - 1) // CHUNK_Z
-    print(f"Writing {{nx}}x{{ny}}x{{nz}} as {{n_blocks}} z-blocks of {{CHUNK_Z}}...")
+    print(f"Writing {{nx}}x{{ny}}x{{nz}} as {{n_blocks}} z-blocks of {{CHUNK_Z}}...", flush=True)
     t0 = time.time()
     for i, z_start in enumerate(range(0, nz, CHUNK_Z)):
         z_end = min(z_start + CHUNK_Z, nz)
@@ -1718,7 +1727,7 @@ def main():
         dataset[:, :, z_start:z_end, :].write(block_xyzc).result()
         elapsed = time.time() - t0
         eta = elapsed / (i + 1) * (n_blocks - i - 1)
-        print(f"  z-block {{i+1:4d}}/{{n_blocks}} ({{z_start:5d}}-{{z_end:5d}})  elapsed {{elapsed:7.0f}}s  eta {{eta:7.0f}}s")
+        print(f"  z-block {{i+1:4d}}/{{n_blocks}} ({{z_start:5d}}-{{z_end:5d}})  elapsed {{elapsed:7.0f}}s  eta {{eta:7.0f}}s", flush=True)
 
     print(f"Base resolution write complete at: {{os.path.abspath(output_path)}}")
 
