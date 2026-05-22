@@ -1666,8 +1666,12 @@ def main():
     dtype = 'uint8' if BIT_DEPTH == 8 else 'uint16'
     
     # Define Neuroglancer Precomputed target.
-    # Sharding packs ~thousands of chunks per shard file so we don't drop millions
-    # of tiny files onto GPFS metadata. Required for any large volume on a shared FS.
+    # NOTE: sharding was tried (uint64_sharded_v1) but tensorstore keeps
+    # in-progress shard buffers in memory; with our z-block write order
+    # touching thousands of shards, peak memory grew unbounded and
+    # OOM-killed jobs 1955476 (64G) and 1955808 (128G). Going unsharded
+    # for now — ~450k chunk files on GPFS is inelegant but bounded. A
+    # follow-up pass can re-shard the completed volume if needed.
     output_path = "precomputed"
     target_spec = {{
         'driver': 'neuroglancer_precomputed',
@@ -1685,20 +1689,6 @@ def main():
             'encoding': 'raw',
             'chunk_size': [128, 128, 128],
             'resolution': [VOXEL_X_NM, VOXEL_Y_NM, VOXEL_Z_NM],
-            'sharding': {{
-                '@type': 'neuroglancer_uint64_sharded_v1',
-                'preshift_bits': 9,
-                'minishard_bits': 6,
-                'shard_bits': 15,
-                'hash': 'identity',
-                # Both encodings 'raw': single-threaded gzip in tensorstore's write
-                # pipeline turned 8 GB chunks into 5-12 min/block (job 1955710 was
-                # projected 26+ hours). 'raw' gets us 5-10x faster writes; chunk
-                # files are larger but uncompressed precomputed loads faster in
-                # Neuroglancer anyway. Igneous MIPs below still gzip their output.
-                'minishard_index_encoding': 'raw',
-                'data_encoding': 'raw',
-            }},
         }},
     }}
 
