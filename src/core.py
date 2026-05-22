@@ -1691,8 +1691,13 @@ def main():
                 'minishard_bits': 6,
                 'shard_bits': 15,
                 'hash': 'identity',
-                'minishard_index_encoding': 'gzip',
-                'data_encoding': 'gzip',
+                # Both encodings 'raw': single-threaded gzip in tensorstore's write
+                # pipeline turned 8 GB chunks into 5-12 min/block (job 1955710 was
+                # projected 26+ hours). 'raw' gets us 5-10x faster writes; chunk
+                # files are larger but uncompressed precomputed loads faster in
+                # Neuroglancer anyway. Igneous MIPs below still gzip their output.
+                'minishard_index_encoding': 'raw',
+                'data_encoding': 'raw',
             }},
         }},
     }}
