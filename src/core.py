@@ -1687,7 +1687,12 @@ def main():
         'scale_metadata': {{
             'size': [nx, ny, nz],
             'encoding': 'raw',
-            'chunk_size': [128, 128, 128],
+            # chunk_size z MUST match CHUNK_Z below so each write covers
+            # complete chunks. Earlier attempts with 128^3 chunks and
+            # CHUNK_Z=32 lost 85% of chunks: tensorstore buffered partial
+            # chunks waiting for the next 3 z-blocks to complete them,
+            # and under memory pressure evicted them silently.
+            'chunk_size': [128, 128, 32],
             'resolution': [VOXEL_X_NM, VOXEL_Y_NM, VOXEL_Z_NM],
         }},
     }}
