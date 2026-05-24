@@ -1683,12 +1683,17 @@ def main():
         }},
         'context': {{
             # Disable the write cache so .result() doesn't return until
-            # data is actually on disk.
+            # data is actually on disk. THIS is the critical fix that
+            # makes writes durable — without it, tensorstore returns
+            # from .result() while data is still in an in-memory cache,
+            # and Python exit drops the in-flight buffer.
             'cache_pool': {{'total_bytes_limit': 0}},
-            # Single in-flight write — no concurrent batching that can
-            # silently drop work under memory pressure.
-            'data_copy_concurrency': {{'limit': 1}},
-            'file_io_concurrency': {{'limit': 1}},
+            # Allow some concurrency so we're not strictly serialized.
+            # Each individual write is still durable; we just permit a
+            # handful in flight. concurrency=1 was way too slow
+            # (~160s/block in job 1958086 -> 10h for base alone).
+            'data_copy_concurrency': {{'limit': 4}},
+            'file_io_concurrency': {{'limit': 4}},
         }},
         'multiscale_metadata': {{
             'type': 'image',
