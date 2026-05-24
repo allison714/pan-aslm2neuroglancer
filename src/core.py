@@ -1666,18 +1666,29 @@ def main():
     dtype = 'uint8' if BIT_DEPTH == 8 else 'uint16'
     
     # Define Neuroglancer Precomputed target.
-    # NOTE: sharding was tried (uint64_sharded_v1) but tensorstore keeps
-    # in-progress shard buffers in memory; with our z-block write order
-    # touching thousands of shards, peak memory grew unbounded and
-    # OOM-killed jobs 1955476 (64G) and 1955808 (128G). Going unsharded
-    # for now — ~450k chunk files on GPFS is inelegant but bounded. A
-    # follow-up pass can re-shard the completed volume if needed.
+    # NOTE: sharding was tried but tensorstore keeps in-progress shard
+    # buffers in memory unboundedly (OOM at 64G and 128G). Going unsharded.
+    # The 'context' block below FORCES synchronous, single-threaded writes
+    # so we don't return from .result() before bytes are durably on disk.
+    # Without this, tensorstore claims completion while writes are still
+    # queued in an internal cache, igneous starts reading before the
+    # cache flushes, hits EmptyVolumeException, Python exits, in-flight
+    # writes are abandoned. Job 1956713 lost 85% of chunks this way.
     output_path = "precomputed"
     target_spec = {{
         'driver': 'neuroglancer_precomputed',
         'kvstore': {{
             'driver': 'file',
             'path': output_path,
+        }},
+        'context': {{
+            # Disable the write cache so .result() doesn't return until
+            # data is actually on disk.
+            'cache_pool': {{'total_bytes_limit': 0}},
+            # Single in-flight write — no concurrent batching that can
+            # silently drop work under memory pressure.
+            'data_copy_concurrency': {{'limit': 1}},
+            'file_io_concurrency': {{'limit': 1}},
         }},
         'multiscale_metadata': {{
             'type': 'image',
@@ -1687,11 +1698,9 @@ def main():
         'scale_metadata': {{
             'size': [nx, ny, nz],
             'encoding': 'raw',
-            # chunk_size z MUST match CHUNK_Z below so each write covers
-            # complete chunks. Earlier attempts with 128^3 chunks and
-            # CHUNK_Z=32 lost 85% of chunks: tensorstore buffered partial
-            # chunks waiting for the next 3 z-blocks to complete them,
-            # and under memory pressure evicted them silently.
+            # chunk_size z matches CHUNK_Z below so each write covers
+            # complete chunks. With [128,128,128] chunks and CHUNK_Z=32,
+            # tensorstore had to buffer partial chunks across z-blocks.
             'chunk_size': [128, 128, 32],
             'resolution': [VOXEL_X_NM, VOXEL_Y_NM, VOXEL_Z_NM],
         }},
@@ -1729,7 +1738,16 @@ def main():
         eta = elapsed / (i + 1) * (n_blocks - i - 1)
         print(f"  z-block {{i+1:4d}}/{{n_blocks}} ({{z_start:5d}}-{{z_end:5d}})  elapsed {{elapsed:7.0f}}s  eta {{eta:7.0f}}s", flush=True)
 
-    print(f"Base resolution write complete at: {{os.path.abspath(output_path)}}")
+    # Explicit close + flush before igneous starts reading. Without this,
+    # tensorstore may still have pending writes buffered when igneous
+    # opens cloud-volume on the same path and reads what's there.
+    print("Closing tensorstore dataset and flushing to disk...", flush=True)
+    del dataset
+    import gc
+    gc.collect()
+    import os as _os
+    _os.sync()  # ask kernel to flush page cache to durable storage
+    print(f"Base resolution write complete at: {{os.path.abspath(output_path)}}", flush=True)
 
     # Build MIP pyramid via igneous so Neuroglancer can render zoomed-out views.
     # Without this, the browser has to fetch full-resolution chunks for any overview.
