@@ -1664,95 +1664,71 @@ def main():
     print(f"Detected Dimensions: X={{nx}}, Y={{ny}}, Z={{nz}}")
     
     dtype = 'uint8' if BIT_DEPTH == 8 else 'uint16'
-    
-    # Define Neuroglancer Precomputed target.
-    # NOTE: sharding was tried but tensorstore keeps in-progress shard
-    # buffers in memory unboundedly (OOM at 64G and 128G). Going unsharded.
-    # The 'context' block below FORCES synchronous, single-threaded writes
-    # so we don't return from .result() before bytes are durably on disk.
-    # Without this, tensorstore claims completion while writes are still
-    # queued in an internal cache, igneous starts reading before the
-    # cache flushes, hits EmptyVolumeException, Python exits, in-flight
-    # writes are abandoned. Job 1956713 lost 85% of chunks this way.
-    output_path = "precomputed"
-    target_spec = {{
-        'driver': 'neuroglancer_precomputed',
-        'kvstore': {{
-            'driver': 'file',
-            'path': output_path,
-        }},
-        'context': {{
-            # Disable the write cache so .result() doesn't return until
-            # data is actually on disk. THIS is the critical fix that
-            # makes writes durable — without it, tensorstore returns
-            # from .result() while data is still in an in-memory cache,
-            # and Python exit drops the in-flight buffer.
-            'cache_pool': {{'total_bytes_limit': 0}},
-            # Allow some concurrency so we're not strictly serialized.
-            # Each individual write is still durable; we just permit a
-            # handful in flight. concurrency=1 was way too slow
-            # (~160s/block in job 1958086 -> 10h for base alone).
-            'data_copy_concurrency': {{'limit': 4}},
-            'file_io_concurrency': {{'limit': 4}},
-        }},
-        'multiscale_metadata': {{
-            'type': 'image',
-            'data_type': dtype,
-            'num_channels': 1,
-        }},
-        'scale_metadata': {{
-            'size': [nx, ny, nz],
-            'encoding': 'raw',
-            # chunk_size z matches CHUNK_Z below so each write covers
-            # complete chunks. With [128,128,128] chunks and CHUNK_Z=32,
-            # tensorstore had to buffer partial chunks across z-blocks.
-            'chunk_size': [128, 128, 32],
-            'resolution': [VOXEL_X_NM, VOXEL_Y_NM, VOXEL_Z_NM],
-        }},
-    }}
-
-    print(f"Creating/Opening target precomputed: {{output_path}}")
-    dataset = ts.open(target_spec, create=True, delete_existing=True).result()
-
-    print(f"Opening source raw via memory map: {{raw_path}}")
-    # pi2 writes flat binary in Z, Y, X order (C-contiguous)
-    vol_zyx = np.memmap(raw_path, dtype=dtype, mode='r', shape=(nz, ny, nx))
 
     # Force line-buffered stdout so Slurm .out captures progress in near-real-time.
-    # Without this Python aggressively buffers under non-TTY and the .out stays empty for hours.
     try:
         sys.stdout.reconfigure(line_buffering=True)
     except Exception:
         pass
 
+    # Cloud-volume for the base write. We previously tried tensorstore with
+    # various contexts (sharded, unsharded, cache_pool=0, concurrency=1..4)
+    # and every variant lost ~85% of chunks under memory pressure: tensorstore
+    # buffers writes internally, MaxRSS hits the cgroup ceiling, dirty pages
+    # get evicted before flush, files never appear on disk. cloud-volume's
+    # per-chunk synchronous fopen/fwrite/fclose has no such failure mode.
+    from cloudvolume import CloudVolume
+
+    output_path = "precomputed"
+    output_abs = os.path.abspath(output_path)
+
+    info = CloudVolume.create_new_info(
+        num_channels=1,
+        layer_type='image',
+        data_type=dtype,
+        encoding='raw',
+        resolution=[VOXEL_X_NM, VOXEL_Y_NM, VOXEL_Z_NM],
+        voxel_offset=[0, 0, 0],
+        chunk_size=[128, 128, 32],   # z aligned with CHUNK_Z below
+        volume_size=[nx, ny, nz],
+    )
+
+    cv = CloudVolume(
+        f'file://{{output_abs}}',
+        info=info,
+        compress=False,
+        fill_missing=True,           # any straggler missing chunk -> read as zeros
+        parallel=4,                  # 4 worker processes for chunk uploads
+        progress=False,
+    )
+    cv.commit_info()
+
+    print(f"Created precomputed at: {{output_abs}}", flush=True)
+    print(f"Opening source raw via memory map: {{raw_path}}", flush=True)
+    # pi2 writes flat binary in Z, Y, X order (C-contiguous)
+    vol_zyx = np.memmap(raw_path, dtype=dtype, mode='r', shape=(nz, ny, nx))
+
     # Write in Z-aligned blocks of CHUNK_Z so memory stays bounded.
-    # Each block: CHUNK_Z * ny * nx * 2 bytes (uint16). tensorstore's write needs a
-    # contiguous copy of the transposed block plus a compression buffer, so peak
-    # memory is ~3x the block size. CHUNK_Z=32 at 11400^2 ~= 8 GB block, ~24 GB peak,
-    # comfortable under a 64 GB sbatch ceiling.
+    # Per block: CHUNK_Z * ny * nx * 2 bytes (uint16). For CHUNK_Z=32 at
+    # ~11400 sq, that's ~8 GB source + ~8 GB transposed + cloud-volume's
+    # per-chunk staging -> peak ~25 GB, fits 64 GB sbatch easily.
+    # cloud-volume writes each 128x128x32 chunk file synchronously inside
+    # cv[...] = block -- when the assignment returns, files are on disk.
     CHUNK_Z = 32
     n_blocks = (nz + CHUNK_Z - 1) // CHUNK_Z
     print(f"Writing {{nx}}x{{ny}}x{{nz}} as {{n_blocks}} z-blocks of {{CHUNK_Z}}...", flush=True)
     t0 = time.time()
     for i, z_start in enumerate(range(0, nz, CHUNK_Z)):
         z_end = min(z_start + CHUNK_Z, nz)
-        block_zyx = np.asarray(vol_zyx[z_start:z_end])     # forces memmap read of just this slab
+        block_zyx = np.asarray(vol_zyx[z_start:z_end])      # forces memmap read of this slab
+        # cloud-volume expects (X, Y, Z, C). For single channel we still pass 4D.
         block_xyzc = block_zyx.transpose(2, 1, 0)[..., None]
-        dataset[:, :, z_start:z_end, :].write(block_xyzc).result()
+        cv[:, :, z_start:z_end] = block_xyzc                # synchronous write
         elapsed = time.time() - t0
         eta = elapsed / (i + 1) * (n_blocks - i - 1)
         print(f"  z-block {{i+1:4d}}/{{n_blocks}} ({{z_start:5d}}-{{z_end:5d}})  elapsed {{elapsed:7.0f}}s  eta {{eta:7.0f}}s", flush=True)
 
-    # Explicit close + flush before igneous starts reading. Without this,
-    # tensorstore may still have pending writes buffered when igneous
-    # opens cloud-volume on the same path and reads what's there.
-    print("Closing tensorstore dataset and flushing to disk...", flush=True)
-    del dataset
-    import gc
-    gc.collect()
-    import os as _os
-    _os.sync()  # ask kernel to flush page cache to durable storage
-    print(f"Base resolution write complete at: {{os.path.abspath(output_path)}}", flush=True)
+    print(f"Base resolution write complete at: {{output_abs}}", flush=True)
 
     # Build MIP pyramid via igneous so Neuroglancer can render zoomed-out views.
     # Without this, the browser has to fetch full-resolution chunks for any overview.
