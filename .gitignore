@@ -16,9 +16,11 @@ venv/
 smoke_test_bundle/
 
 # Per-run helper scripts (hardcoded to a specific bundle; not for sharing)
-push_converter.ps1
-push_convert_sbatch.ps1
+push_*.ps1
+pull_*.ps1
 regen_converter.py
+make_preview.py
+extract_for_fiji.py
 
 # OS / editor
 .DS_Store
