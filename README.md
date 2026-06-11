@@ -1,4 +1,4 @@
-# pan-aslm2neuroglancer — Run Bundle Generator
+# panaslm2neuroglancer — Run Bundle Generator
 
 A Streamlit GUI that generates ready-to-execute **Run Bundles** for stitching large pan-ASLM light-sheet datasets using [pi2/NRStitcher](https://github.com/arttumiettinen/pi2).
 
@@ -26,8 +26,8 @@ Supports both **local workstations** (Windows / Mac / Linux) and the **Misha HPC
 ### 1. Clone the Repo
 
 ```bash
-git clone https://github.com/allison714/pan-aslm2neuroglancer.git
-cd pan-aslm2neuroglancer
+git clone https://github.com/kuan-lab/panaslm2neuroglancer.git
+cd panaslm2neuroglancer
 ```
 
 ### 2. Launch the App
@@ -89,7 +89,7 @@ This is the **offline configuration** model: generate the bundle locally, upload
 |---|---|
 | `/gpfs/radev/scratch/kuan/amc345/raw/` | Raw input data (fast scratch) |
 | `/gpfs/marilyn/pi/kuan/shared/Allison/` | Output for stitched results (shared storage) |
-| `/gpfs/radev/scratch/kuan/amc345/pan-aslm2neuroglancer/pi2-4.5-linux/` | pi2 binary on Misha |
+| `/gpfs/radev/scratch/kuan/amc345/panaslm2neuroglancer/pi2-4.5-linux/` | pi2 binary on Misha |
 
 ---
 
@@ -177,7 +177,7 @@ rsync -a . $SCRATCH && cd $SCRATCH
 ## Project Structure
 
 ```
-pan-aslm2neuroglancer/
+panaslm2neuroglancer/
 ├── app.py                    # Main Streamlit application
 ├── src/
 │   └── core.py               # Bundle generation logic (stitch settings, Slurm, local scripts)
