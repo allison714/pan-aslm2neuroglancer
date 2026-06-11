@@ -1977,7 +1977,8 @@ def main():
         mip=0,
         num_mips=NUM_MIPS,
         sparse=False,
-        compress='gzip',
+        compress=False,  # must match info's encoding="raw"; gzip writes .gz suffix
+                         # files that neuroglancer's un-suffixed URL requests miss
         factor=DOWNSAMPLE_FACTOR,
     )
     tq.insert(tasks)
