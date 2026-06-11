@@ -573,6 +573,78 @@ def generate_slurm_script(manifest: DatasetManifest, slurm_params: Dict, conda_c
     with open(os.path.join(output_dir, "run_nrstitcher.sbatch"), 'w', newline='\n') as f:
         f.write(script)
 
+
+def generate_convert_slurm_script(manifest: DatasetManifest, slurm_params: Optional[Dict], conda_config: Dict, output_dir: str, stage_to_tmp: bool = False):
+    """
+    Generates convert.sbatch — the post-stitch wrapper that runs
+    convert_to_neuroglancer.py on Misha.
+
+    Sibling of generate_slurm_script. Skips stacker / stitcher resolution since
+    this is a pure-Python step (cloud-volume + igneous). Defaults match the
+    hand-written convert.sbatch that successfully produced the 1.86 TB
+    precomputed pyramid for 3dtile_4x4x7200 (job 1958609, ~3 h, peak ~25 GB).
+    """
+    sp = slurm_params or {}
+    env_name = conda_config.get('env_name', 'pi2_env')
+
+    lines = [
+        "#!/bin/bash",
+        f"#SBATCH --job-name={manifest.dataset_name}_convert",
+        f"#SBATCH --partition={sp.get('partition', 'day')}",
+        "#SBATCH --ntasks=1",
+        f"#SBATCH --cpus-per-task={sp.get('cpus', 8)}",
+        f"#SBATCH --mem={sp.get('mem', '64G')}",
+        f"#SBATCH --time={sp.get('time', '06:00:00')}",
+        "#SBATCH --output=%x_%j.out",
+        "#SBATCH --error=%x_%j.err",
+        "",
+        "set -eo pipefail",
+        "",
+        f'echo "Starting Neuroglancer conversion for {manifest.dataset_name}"',
+        "date",
+        "",
+        "# Load Misha Modules (Blosc used by cloud-volume backends; rest are no-ops here)",
+    ]
+    lines += [f"module load {m}" for m in _MISHA_MODULES]
+    lines += [
+        "",
+        "# Initialize Conda (Misha Default)",
+        "set +e",
+        f"source {_MISHA_CONDA_INIT}",
+        f"conda activate {env_name}",
+        "set -e",
+        "",
+        _ENV_VERIFY_BLOCK,
+        "",
+        "# Pin OpenMP / cloud-volume worker threads to allocated CPUs",
+        'export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"',
+        "",
+    ]
+    if stage_to_tmp:
+        lines += [_STAGING_BLOCK, ""]
+    lines += [
+        "# --- Preflight: converter script must be present in the bundle ---",
+        "if [ ! -f convert_to_neuroglancer.py ]; then",
+        '    echo "[ERROR] convert_to_neuroglancer.py not found in $(pwd). Bundle is incomplete." >&2',
+        "    exit 1",
+        "fi",
+        "",
+        "# --- Execute conversion: raw -> precomputed + MIP pyramid ---",
+        'echo "Running convert_to_neuroglancer.py..."',
+        "python convert_to_neuroglancer.py",
+        "",
+        'echo "Done"',
+        "date",
+        "",
+        _MONITORING_FOOTER,
+        "",
+    ]
+
+    script = "\n".join(lines)
+    with open(os.path.join(output_dir, "convert.sbatch"), 'w', newline='\n', encoding='utf-8') as f:
+        f.write(script)
+
+
 def generate_manifest(manifest: DatasetManifest, output_dir: str):
     """
     Writes the dataset manifest to JSON.
@@ -1340,6 +1412,14 @@ FILES = {manifest.files}
 N_CHANNELS = {manifest.n_channels}
 Z_SLICES = {manifest.z_slices}
 N_TILES = {manifest.n_tiles_x * manifest.n_tiles_y}
+TILE_W = {manifest.width_px}
+TILE_H = {manifest.height_px}
+BYTES_PER_PIXEL = {max(1, manifest.bit_depth // 8)}
+# Raw image payload per tile (TIFF header adds a small constant on top).
+EXPECTED_PAYLOAD = Z_SLICES * TILE_H * TILE_W * BYTES_PER_PIXEL
+# Treat any file at >=99% of expected payload as a complete prior run.
+# Anything smaller is a partial write (typical failure mode: ENOSPC).
+COMPLETE_THRESHOLD = int(EXPECTED_PAYLOAD * 0.99)
 
 def parse_filename(filename):
     # Extract number from end
@@ -1416,11 +1496,19 @@ def main():
                 out_name = f"tile_{{t_idx:03d}}.tif"
                 
             out_path = os.path.join(OUTPUT_DIR, out_name)
+            # Size-aware idempotent skip: a bare existence check would accept a
+            # 16-byte stub left behind by a previous ENOSPC mid-write, and the
+            # downstream stitcher would then read garbage. Verify the file is
+            # actually complete before skipping; otherwise nuke and rebuild.
             if os.path.exists(out_path):
-                print(f"Skipping {{out_name}} (exists)")
-                continue
-                
-            print(f"Stacking {{out_name}}...")
+                existing_size = os.path.getsize(out_path)
+                if existing_size >= COMPLETE_THRESHOLD:
+                    print(f"Skipping {{out_name}} (complete, {{existing_size:,}} bytes)", flush=True)
+                    continue
+                print(f"Removing partial {{out_name}} ({{existing_size:,}} bytes, need >= {{COMPLETE_THRESHOLD:,}})", flush=True)
+                os.remove(out_path)
+
+            print(f"Stacking {{out_name}}...", flush=True)
             
             # Read images
             # Lazy approach: read first to allow memory estimation?
@@ -1446,7 +1534,19 @@ def main():
                 tifffile.imwrite(out_path, vol)
                 
             except Exception as e:
-                print(f"Failed to stack {{out_name}}: {{e}}")
+                # Hard-fail the whole script. The previous version printed and
+                # continued, so an ENOSPC mid-stacking left the loop to march
+                # on writing 16-byte TIFF stubs and the wrapper sbatch happily
+                # ran nr_stitcher on garbage input. Always: cleanup partial,
+                # then re-raise so the sbatch wrapper exits non-zero.
+                print(f"Failed to stack {{out_name}}: {{e}}", flush=True)
+                if os.path.exists(out_path):
+                    try:
+                        os.remove(out_path)
+                        print(f"  removed partial {{out_name}}", flush=True)
+                    except OSError as rm_err:
+                        print(f"  could not remove partial {{out_name}}: {{rm_err}}", flush=True)
+                raise
 
     print("Stacking Complete.")
 
@@ -1456,6 +1556,130 @@ if __name__ == "__main__":
     
     with open(os.path.join(output_dir, "stack_tiles.py"), "w") as f:
         f.write(script_content)
+
+
+def generate_tile_grid_viewer(manifest: DatasetManifest, output_dir: str):
+    """
+    Generates tile_grid_viewer.py: a Fiji-friendly QC mosaic of per-tile stacks.
+
+    Reads stacks/tile_NNN.tif, lays them out in their spatial grid positions
+    (NOT stitched), downsamples each by DOWNSAMPLE_XY, and writes a multi-page
+    BigTIFF with one page per Z_STRIDE'th z-slice. Useful for spotting per-tile
+    brightness drift, empty tiles, or gross misalignment before committing to a
+    full stitch.
+    """
+    scan_order = manifest.scan_order
+    n_tiles_x = manifest.n_tiles_x
+    n_tiles_y = manifest.n_tiles_y
+    tile_w = manifest.width_px
+    tile_h = manifest.height_px
+
+    script_content = f'''"""Build a multi-page TIFF where each page is a {n_tiles_x}x{n_tiles_y} mosaic of all tiles' z-slices.
+
+Tiles are placed in their spatial positions, NOT stitched — this is a raw
+diagnostic view to spot per-tile brightness, gross misalignment, or empty
+tiles. Each tile is XY-downsampled DOWNSAMPLE_XY-fold; Z is sub-sampled by
+Z_STRIDE.
+
+Reads from the per-tile stacks already on disk:
+    stacks/tile_NNN.tif
+
+Run from the bundle dir (locally or on Misha via srun):
+    python tile_grid_viewer.py
+
+Output: tile_grid_viewer.tif (multi-page BigTIFF).
+Open in Fiji and scrub through z. Each page label shows the z value.
+
+Generated by the Run Bundle Generator.
+"""
+import os
+import numpy as np
+import tifffile
+
+# ---------- CONFIG (baked in from dataset_manifest.json) ----------
+N_TILES_X = {n_tiles_x}
+N_TILES_Y = {n_tiles_y}
+SCAN_ORDER = {scan_order!r}
+TILE_W = {tile_w}           # source tile width in px
+TILE_H = {tile_h}           # source tile height in px
+DOWNSAMPLE_XY = 16          # tunable; 16 -> ~200 px per tile if TILE_W=3200
+Z_STRIDE = 10               # every Nth z-slice; set to 1 for all
+# ------------------------------------------------------------------
+
+SMALL_W = max(1, TILE_W // DOWNSAMPLE_XY)
+SMALL_H = max(1, TILE_H // DOWNSAMPLE_XY)
+
+
+def tile_idx_to_xy(t, ntx, nty, order):
+    """Mirror src/core.py:tile_idx_to_xy. Returns (col, row) grid coords."""
+    if order == "Column Serpentine (pan-ASLM)":
+        col = t // nty
+        row_raw = t % nty
+        row = row_raw if col % 2 == 0 else (nty - 1 - row_raw)
+        return col, row
+    if order == "Row Serpentine (Boustrophedon)":
+        row = t // ntx
+        col_raw = t % ntx
+        col = col_raw if row % 2 == 0 else (ntx - 1 - col_raw)
+        return col, row
+    # Raster (Row-by-Row) and any unknown order
+    return (t % ntx, t // ntx)
+
+
+def main():
+    n_tiles = N_TILES_X * N_TILES_Y
+    stacks = [f"stacks/tile_{{t:03d}}.tif" for t in range(n_tiles)]
+    missing = [s for s in stacks if not os.path.exists(s)]
+    if missing:
+        raise SystemExit(f"Missing stack files (run stack_tiles.py first): {{missing}}")
+
+    print(f"Opening {{len(stacks)}} tile stacks...", flush=True)
+    handles = [tifffile.TiffFile(s) for s in stacks]
+    n_z = len(handles[0].pages)
+    print(f"Each tile has {{n_z}} z-slices", flush=True)
+
+    positions = [tile_idx_to_xy(t, N_TILES_X, N_TILES_Y, SCAN_ORDER)
+                 for t in range(n_tiles)]
+    print("Tile positions (idx -> col,row):")
+    for t, (c, r) in enumerate(positions):
+        print(f"  tile_{{t:03d}} -> col={{c}} row={{r}}")
+
+    z_list = list(range(0, n_z, Z_STRIDE))
+    print(f"Writing {{len(z_list)}} pages (every {{Z_STRIDE}}th z of {{n_z}})", flush=True)
+
+    out_path = "tile_grid_viewer.tif"
+    mosaic_w = N_TILES_X * SMALL_W
+    mosaic_h = N_TILES_Y * SMALL_H
+
+    with tifffile.TiffWriter(out_path, bigtiff=True) as tw:
+        for i, z in enumerate(z_list):
+            page = np.zeros((mosaic_h, mosaic_w), dtype=np.uint16)
+            for t, (col, row) in enumerate(positions):
+                plane = handles[t].pages[z].asarray()
+                small = plane[::DOWNSAMPLE_XY, ::DOWNSAMPLE_XY]
+                # Crop in case TILE_W/H wasn't an exact multiple of DOWNSAMPLE_XY
+                small = small[:SMALL_H, :SMALL_W]
+                y0 = row * SMALL_H
+                x0 = col * SMALL_W
+                page[y0:y0 + small.shape[0], x0:x0 + small.shape[1]] = small
+            tw.write(page, description=f"z={{z}}", contiguous=False)
+            if (i + 1) % 25 == 0 or i + 1 == len(z_list):
+                print(f"  wrote page {{i+1}}/{{len(z_list)}}  (z={{z}})", flush=True)
+
+    for h in handles:
+        h.close()
+
+    sz_gb = os.path.getsize(out_path) / 1e9
+    print(f"Done. {{out_path}} ({{sz_gb:.2f}} GB)  pages={{len(z_list)}}  mosaic={{mosaic_w}}x{{mosaic_h}}")
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+    with open(os.path.join(output_dir, "tile_grid_viewer.py"), "w", newline="\n", encoding="utf-8") as f:
+        f.write(script_content)
+
 
 def generate_qc_config_script(manifest: DatasetManifest, output_dir: str):
     """

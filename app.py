@@ -18,15 +18,17 @@ except:
 
 from core import (
     load_files, parse_filename, validate_dataset, infer_tiff_metadata,
-    generate_stitch_settings, generate_slurm_script, generate_local_script, generate_manifest,
+    generate_stitch_settings, generate_local_script, generate_manifest,
     DatasetManifest, ScanOrder, ChannelOrder, map_index, xy_to_tile_idx
 )
 
-st.set_page_config(page_title="Slurm Run Bundle Generator", layout="wide")
+st.set_page_config(page_title="Local Run Bundle Generator", layout="wide")
 
-st.title("Slurm-Ready Run Bundle Generator")
+st.title("Local Run Bundle Generator")
 st.markdown("""
-Generates configuration and scripts for stitching large datasets on Misha cluster (pi2/NRStitcher).
+Generates a self-contained run bundle for stitching pan-ASLM datasets on a local workstation (Windows / Mac / Linux) via pi2/NRStitcher.
+
+For Misha HPC bundles use `python make_misha_bundle.py …` from the repo root — the cluster path lives outside this UI.
 """)
 
 # --- Dynamic Local PATH Injection ---
@@ -93,28 +95,22 @@ with st.sidebar.expander("Tool Availability", expanded=False):
 if deps_missing:
     st.sidebar.warning("Missing dependencies may prevent script generation or background execution from working locally on this PC.", icon="⚠️")
 
-# --- YCRC Best Practices Info ---
-st.sidebar.info("💡 **Yale HPC Tips**\n\n"
-               "- For **>100GB datasets**, use **Globus** rather than drag-and-drop or `scp`.\n"
-               "- If writes fail or job dies during output, check **`getquota`** or OOD Quotas.\n")
-
 # --- Sidebar Inputs ---
 st.sidebar.header("Dataset Configuration")
 
 # Default path for convenience (user specific)
-default_path = r"/gpfs/radev/scratch/kuan/amc345/raw/"
+default_path = r"X:\nginx_share\exm\2026\pan-ASLM"
 data_path = st.sidebar.text_input(
-    "Raw Data Directory", 
+    "Raw Data Directory",
     value=default_path,
     help="Path to the folder containing your raw TIFF files.\n\n"
          "**Windows:** `C:\\Users\\YourName\\ImageFolder`\n\n"
-         "**macOS:** `/Users/YourName/ImageFolder`\n\n"
-         "**Misha/Linux:** `/gpfs/radev/scratch/kuan/amc345/raw/...`"
+         "**macOS / Linux:** `/Users/YourName/ImageFolder`"
 )
 from datetime import datetime
 default_dataset_name = f"{datetime.now().strftime('%y%m%d')}_HC_4x4x7200"
 dataset_name = st.sidebar.text_input("Dataset Name (Output Folder)", value=default_dataset_name, help="Format: YYMMDD_ROI_TilesX_TilesY_ZSlices (e.g. 260216_HC_4x4x7200)")
-output_base_dir = st.sidebar.text_input("Output Location", value=r"/gpfs/marilyn/pi/kuan/shared/Allison")
+output_base_dir = st.sidebar.text_input("Output Location", value=os.path.dirname(__file__))
 
 st.sidebar.subheader("Metadata")
 prefix_filter = st.sidebar.text_input("Filename Prefix Filter", value="ss_single_", help="Only files starting with this will be included.")
@@ -145,7 +141,7 @@ st.header("1. Dataset Validation")
 if not data_path:
     st.info("Enter a data directory to begin.")
 elif not os.path.exists(data_path):
-    st.warning("Directory does not exist locally (this is perfectly normal if you are targeting the Misha cluster).")
+    st.warning("Directory does not exist on this machine. The bundle can still be generated, but file validation and tile preview will be skipped.")
 else:
     if validation_res.get('valid'):
         st.success(f"Validation Passed: {validation_res['message']}")
@@ -244,57 +240,32 @@ curr_total = len(files)
 st.metric("Expected File Count", expected_total, delta=curr_total - expected_total, delta_color="inverse")
 
 if curr_total != expected_total:
-    is_remote = not os.path.exists(data_path) and bool(data_path)
-    if not is_remote:
-        st.error(f"Count Mismatch! Found {curr_total}, expected {expected_total}. Check parameters.")
-    else:
-        st.info("Local file count validation bypassed (assuming remote target).")
+    st.error(f"Count Mismatch! Found {curr_total}, expected {expected_total}. Check parameters.")
 
 # --- Execution Config ---
 with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=False):
-    # --- Execution Config ---
     st.header("3. Execution Configuration")
+    st.caption("This UI targets local workstations only. For Misha bundles, run `python make_misha_bundle.py …` from the repo root.")
 
-    execution_mode = st.radio(
-        "Target Environment",
-        ("Misha Cluster (Slurm)", "Local Workstation"),
-        index=1
-    )
-
-    # Initialize session state for Slurm params if not set
-    if 'slurm_partition' not in st.session_state: st.session_state['slurm_partition'] = 'day'
-    if 'slurm_time' not in st.session_state: st.session_state['slurm_time'] = '04:00:00'
-    if 'slurm_cpus' not in st.session_state: st.session_state['slurm_cpus'] = 8
-    if 'slurm_mem' not in st.session_state: st.session_state['slurm_mem'] = '64G'
-
-    slurm_params = {}
     conda_config = {}
 
     st.subheader("Conda / pi2 Backend Configuration")
     with st.expander("Configure Backend Paths", expanded=True):
-        # Set defaults based on mode
-        if execution_mode == "Misha Cluster (Slurm)":
-            def_conda_sh = "/gpfs/radev/apps/avx512/software/miniconda/24.3.0-miniforge/etc/profile.d/conda.sh"
-            def_entry = "/gpfs/radev/scratch/kuan/amc345/pan-aslm2neuroglancer/pi2-4.5-linux/bin-linux64/release-nocl/nr_stitcher.py"
-            def_env = "pi2_env"
-        else:
-            # Local defaults
-            def_conda_sh = r"C:\Users\allis\anaconda3\condabin\conda.BAT" 
-            def_entry = "" 
-            def_env = "stitch_app"
+        def_conda_sh = r"C:\Users\allis\anaconda3\condabin\conda.BAT"
+        def_entry = ""
+        def_env = "stitch_app"
 
-        # Initialize from state if possible logic? No, simple inputs
         c1, c2 = st.columns(2)
         with c1:
-            conda_sh = st.text_input("Conda Init Script (conda.sh)", value=def_conda_sh, help="Path to conda.sh to source.")
+            conda_sh = st.text_input("Conda Init Script (conda.sh)", value=def_conda_sh, help="Path to conda.sh / conda.BAT to source.")
             env_name = st.text_input("Conda Environment Name", value=def_env)
         with c2:
-            entrypoint = st.text_input("Entrypoint Override (Optional)", value=def_entry, help="Only set if auto-detection fails (e.g., full path to executable).")
-            
-            # Auto-detect local resource
+            entrypoint = st.text_input("Entrypoint Override (Optional)", value=def_entry, help="Only set if auto-detection fails (e.g., full path to a stitcher executable).")
+
+            # Auto-detect local pi2 binary
             resource_path = os.path.join(os.path.dirname(__file__), 'resources', 'pi2')
             d_drive_path = r"D:\pi2-v4.5-win-no-opencl"
-            
+
             if os.path.exists(resource_path) and os.listdir(resource_path):
                 default_pi2 = resource_path
                 st.success("✅ Found locally 'vendored' pi2 in `resources/pi2`.")
@@ -303,64 +274,43 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
                 st.success(f"✅ Auto-detected pi2 on D: drive: `{d_drive_path}`")
             else:
                 default_pi2 = ""
-            
-            pi2_local_path = st.text_input(
-                "Path to 'pi2' Source/Binaries", 
-                value=default_pi2,
-                placeholder=r"C:\Users\... OR /gpfs/radev/...", 
-                help="""
-**Windows / Local**: Folder containing the 'pi2' package. 
-⬇️ Download `pi2-v4.5-win-no-opencl.zip` from: https://github.com/arttumiettinen/pi2/releases
 
-**Misha / Linux Cluster**: Do NOT assume standard `make` works without configuration.
-1. Download Linux source zip to Misha.
-2. Review `Makefile` and identify paths (default macOS headers will fail).
-3. If using prebuilt binary, place it here.
-4. If building, configure `CXXFLAGS` or `Makefile.local` appropriately for Misha's GCC/FFTW modules before running `make`.
-"""
+            pi2_local_path = st.text_input(
+                "Path to 'pi2' Source/Binaries",
+                value=default_pi2,
+                placeholder=r"C:\Users\... or D:\pi2-v4.5-win-no-opencl",
+                help="Folder containing the local 'pi2' binaries. "
+                     "Download `pi2-v4.5-win-no-opencl.zip` from "
+                     "https://github.com/arttumiettinen/pi2/releases"
             )
-                
-            # Auto detection helpers
+
             if st.button("Auto-detect (Local)"):
-                import shutil
-                
-                # Check for conda
                 conda_path = shutil.which("conda")
                 if conda_path:
                     st.success(f"Found 'conda' at: {conda_path}")
-                    
-                    # List environments
                     try:
-                        import subprocess
-                        import json
-                        # Use full path or just 'conda'
-                        cmd = [conda_path, "env", "list", "--json"]
-                        result = subprocess.run(cmd, capture_output=True, text=True)
+                        import subprocess, json
+                        result = subprocess.run([conda_path, "env", "list", "--json"], capture_output=True, text=True)
                         if result.returncode == 0:
-                            env_data = json.loads(result.stdout)
-                            envs = [os.path.basename(p) for p in env_data.get('envs', [])]
+                            envs = [os.path.basename(p) for p in json.loads(result.stdout).get('envs', [])]
                             st.info(f"Available Environments: {', '.join(envs)}")
                             st.caption("Copy one of these names into 'Conda Environment Name' if it contains pi2.")
                     except Exception as e:
                         st.warning(f"Could not list environments: {e}")
                 else:
                     st.warning("'conda' command not found in PATH.")
-                    
-                # Check for stitcher binaries
+
                 found = shutil.which("nrstitcher") or shutil.which("pi2")
                 if found:
                     st.success(f"Found stitcher binary: {found}")
+                elif default_pi2:
+                    st.info(f"✅ **Stitcher Status**: Ready (Found binary at `{default_pi2}`)")
                 else:
-                    if default_pi2:
-                        st.info(f"✅ **Stitcher Status**: Ready (Found binary at `{default_pi2}`)")
-                    else:
-                        try:
-                            import pi2
-                            st.info(f"✅ **Stitcher Status**: Installed in current env (`{pi2.__file__}`)")
-                        except ImportError:
-                            st.warning("⚠️ **Stitcher Status**: Not found in current env. (This is OK if you are generating a bundle for another machine or using the D: drive binary, but check the path above!)")
-                        except:
-                            pass
+                    try:
+                        import pi2
+                        st.info(f"✅ **Stitcher Status**: Installed in current env (`{pi2.__file__}`)")
+                    except ImportError:
+                        st.warning("⚠️ **Stitcher Status**: Not found in current env. Set the pi2 source path above or install pi2 into this env.")
 
         conda_config = {
             'conda_sh': conda_sh,
@@ -368,71 +318,7 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             'entrypoint': entrypoint
         }
 
-    if execution_mode == "Misha Cluster (Slurm)":
-        st.subheader("Slurm Resources")
-        
-        # Auto-Recommend Controls
-        col_auto, col_mode = st.columns(2)
-        with col_auto:
-            auto_recommend = st.checkbox("Auto-Recommend Resources?", value=False)
-        with col_mode:
-            rec_mode = st.radio("Run Mode", ["Production (day/week)", "Calibration (devel)"], index=0)
-            
-        if auto_recommend:
-            # Default speed since benchmark removed
-            default_speed = 100.0 
-                
-            # create temp manifest for estimation
-            tmp_manifest = DatasetManifest(
-                dataset_name=dataset_name, n_tiles_x=n_tiles_x, n_tiles_y=n_tiles_y, z_slices=z_slices, n_channels=n_channels,
-                overlap_x=int(overlap_x), overlap_y=int(overlap_y), voxel_size_x_um=voxel_x, voxel_size_y_um=voxel_y, voxel_size_z_um=voxel_z,
-                scan_order=scan_order, channel_order=channel_order, width_px=img_w, height_px=img_h, bit_depth=img_bd,
-                prefix_filter=prefix_filter, files=files
-            )
-            
-            from core import estimate_resources
-            mode_key = "production" if "Production" in rec_mode else "calibration"
-            # Passing default speed
-            est = estimate_resources(tmp_manifest, default_speed, mode=mode_key)
-            
-            # Update session state
-            st.session_state['slurm_partition'] = est['partition']
-            st.session_state['slurm_cpus'] = est['cpus']
-            st.session_state['slurm_mem'] = est['mem']
-            st.session_state['slurm_time'] = est['time']
-            
-            st.caption(f"Recommendation: {est['details']}")
-
-        scol1, scol2 = st.columns(2)
-        with scol1:
-            partition = st.text_input("Partition", key='slurm_partition')
-            time_limit = st.text_input("Time Limit", key='slurm_time')
-            
-            if partition == "week":
-                try:
-                    h = int(time_limit.split(':')[0])
-                    if h <= 24:
-                        st.warning("YCRC Policy: Do not submit <24h jobs to 'week'. Use 'day'.", icon="⚠️")
-                except:
-                    pass
-
-        with scol2:
-            cpus = st.number_input("CPUs per Task", min_value=1, key='slurm_cpus')
-            st.caption("Only increase CPUs if NRStitcher scales; verify with `jobstats`.")
-            mem = st.text_input("Memory", key='slurm_mem')
-            st.warning("OOM kills the job! Memory limits are strictly enforced.", icon="⚠️")
-        
-        stage_to_tmp = st.checkbox("Stage heavy I/O to local /tmp (Recommended for YCRC)", value=False, help="Copies files to compute node's /tmp before running, and back after. Avoids network filesystem bottlenecks. Note: /tmp is shared local node storage.")
-
-        slurm_params = {
-            'partition': partition,
-            'time': time_limit,
-            'cpus': cpus,
-            'mem': mem
-        }
-    else:
-        stage_to_tmp = False
-        st.info("Local execution scripts (run_local.bat/.sh) will be generated.")
+    st.info("Local execution scripts (`run_local.bat` / `run_local.sh`) will be generated.")
 
     # Alignment Settings
     st.subheader("Stitching Presets")
@@ -799,17 +685,14 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             create_tiles_view = False
             tiles_view_possible = False
 
-    is_slurm = (execution_mode == "Misha Cluster (Slurm)")
-    generate_btn = st.button("Generate Run Bundle", disabled=(curr_total == 0 and not is_slurm))
+    generate_btn = st.button("Generate Run Bundle", disabled=(curr_total == 0))
 
     if generate_btn:
-        # Determine output folder suffix based on mode
+        # Determine output folder name
         from datetime import datetime
         date_str = datetime.now().strftime("%y%m%d")
-        mode_slug = "slurm" if execution_mode == "Misha Cluster (Slurm)" else "local"
-        # User Request: YYMMDD_local_nr_dataset
         align_slug = "nr" if allow_warping else "rigid"
-        output_folder = f"{date_str}_{mode_slug}_{align_slug}_{dataset_name}"
+        output_folder = f"{date_str}_local_{align_slug}_{dataset_name}"
         output_dir = os.path.join(output_base_dir, output_folder)
         st.session_state['last_output_dir'] = output_dir
         
@@ -861,6 +744,9 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             # Generate Stacking Script (Preprocessing)
             core.generate_stack_script(manifest, output_dir, data_path)
 
+            # QC: per-tile mosaic preview (Fiji-friendly multi-page BigTIFF)
+            core.generate_tile_grid_viewer(manifest, output_dir)
+
             # nr_stitcher only supports 'raw' or 'zarr'
             want_neuroglancer = "Neuroglancer Precomputed" in output_formats
             want_zarr = "Zarr" in output_formats
@@ -884,32 +770,19 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             if want_neuroglancer:
                 core.generate_neuroglancer_converter(manifest, output_dir, binning=stitch_binning)
             
-            if execution_mode == "Misha Cluster (Slurm)":
-                # Ensure we pass conda_config to generate the correct Misha initialization
-                try:
-                    core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir, stage_to_tmp=stage_to_tmp)
-                except TypeError:
-                    # Python cache sometimes fails to hot-reload the updated signature.
-                    import importlib
-                    importlib.reload(core)
-                    try:
-                        core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir, stage_to_tmp=stage_to_tmp)
-                    except TypeError:
-                        core.generate_slurm_script(manifest, slurm_params, conda_config, output_dir)
+            embed_path = pi2_local_path if 'pi2_local_path' in locals() and pi2_local_path else None
+
+            # Validation for Portable Bundle
+            if embed_path and not os.path.exists(embed_path):
+                st.error(f"Invalid 'pi2' source path: {embed_path}")
+                st.stop()
+
+            core.generate_local_script(manifest, output_dir, conda_config, embed_pi2_path=embed_path, convert_neuroglancer=want_neuroglancer)
+
+            if not embed_path:
+                st.warning("No 'pi2' source path provided. You MUST download 'pi2' manually and provide the path to create a portable bundle, or ensure it is installed in your environment.")
             else:
-                embed_path = pi2_local_path if 'pi2_local_path' in locals() and pi2_local_path else None
-                
-                # Validation for Portable Bundle
-                if embed_path and not os.path.exists(embed_path):
-                    st.error(f"Invalid 'pi2' source path: {embed_path}")
-                    st.stop()
-                    
-                core.generate_local_script(manifest, output_dir, conda_config, embed_pi2_path=embed_path, convert_neuroglancer=want_neuroglancer)
-                
-                if not embed_path:
-                    st.warning("No 'pi2' source path provided. You MUST download 'pi2' manually and provide the path to create a portable bundle, or ensure it is installed in your environment.")
-                else:
-                    st.success(f"Embedded 'pi2' from: {embed_path}")
+                st.success(f"Embedded 'pi2' from: {embed_path}")
             
             # Show output format summary
             fmt_list = []
@@ -919,22 +792,8 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
             st.info(f"📦 Output format(s): **{', '.join(fmt_list)}**")
             
             st.success(f"Successfully generated run bundle at: `{output_dir}`")
-            
-            if execution_mode == "Misha Cluster (Slurm)":
-                st.markdown("""
-                ### 📊 YCRC Job Monitoring
-                **Once you submit your job (`sbatch run_nrstitcher.sbatch`), use these commands to monitor it:**
-                
-                *   **Check queue status:**
-                    `squeue -u $USER`
-                *   **Watch live CPU/Mem usage:**
-                    `jobstats <jobid>`
-                *   **Check memory efficiency (especially for short jobs):**
-                    `seff <jobid>`
-                *   **Review MaxRSS and allocations:**
-                    `sacct -j <jobid> --format=JobID,State,ExitCode,Elapsed,MaxRSS,AllocTRES`
-                """)
-            
+            st.markdown("**Next:** open the bundle folder and double-click `run_local.bat` (Windows) or `./run_local.sh` (Mac/Linux) to start the stitch.")
+
             st.balloons()
         except Exception as e:
             st.error(f"Error generating bundle: {e}")

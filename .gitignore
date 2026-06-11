@@ -22,6 +22,13 @@ regen_converter.py
 make_preview.py
 extract_for_fiji.py
 
+# QC / preview outputs (too large for github; regenerable from stacks/)
+base_zslab.tif
+mip*_volume.tif
+tile_grid_viewer.tif
+tile_grid_viewer*.avi
+tile_grid_viewer*.gif
+
 # OS / editor
 .DS_Store
 Thumbs.db
