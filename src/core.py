@@ -167,6 +167,110 @@ def xy_to_tile_idx(gx: int, gy: int, n_tiles_x: int, n_tiles_y: int, scan_order:
     else:
         return gy * n_tiles_x + gx
 
+
+def parse_zstack_filename(filename: str) -> Optional[Tuple[int, str]]:
+    """
+    Parses a filename to extract (tile_index, channel_name_or_wavelength).
+    Returns (tile_idx, channel) or None if it doesn't match a z-stack pattern.
+    """
+    stem = os.path.splitext(filename)[0]
+    
+    # Pattern 1: Zstack00000488 -> tile 0, ch '488'
+    m = re.match(r'^Zstack(\d{5})(\d{3,4})$', stem, re.IGNORECASE)
+    if m:
+        return int(m.group(1)), m.group(2)
+        
+    # Pattern 2: Zstack_tile01_ch488 or Zstack_t00_c560
+    m = re.match(r'^(?:Zstack[_\-]?)?t(?:ile)?[_\-]?(\d+)[_\-]?(?:c(?:h)?)?(\d+)?$', stem, re.IGNORECASE)
+    if m:
+        t_idx = int(m.group(1))
+        ch = m.group(2) if m.group(2) else "ch0"
+        return t_idx, str(ch)
+        
+    # Pattern 3: Zstack_00000_488 or Zstack-0-488
+    m = re.match(r'^Zstack[_\-](\d+)[_\-](\d+)$', stem, re.IGNORECASE)
+    if m:
+        return int(m.group(1)), m.group(2)
+        
+    # Pattern 4: Zstack00000 (single channel zstack)
+    m = re.match(r'^Zstack(\d+)$', stem, re.IGNORECASE)
+    if m:
+        return int(m.group(1)), "ch0"
+        
+    return None
+
+def detect_zstack_dataset(data_path: str, files: List[str]) -> Optional[Dict]:
+    """
+    Checks whether the list of files represents a 3D Z-stack dataset.
+    Returns a dict with parsed metadata if True, or None if standard 2D slice dataset.
+    """
+    if not files or not data_path or not os.path.isdir(data_path):
+        return None
+
+    parsed_entries = []
+    for f in files:
+        parsed = parse_zstack_filename(f)
+        if parsed is not None:
+            parsed_entries.append((f, parsed[0], parsed[1]))
+
+    has_zstack_names = len(parsed_entries) > 0 and (
+        len(parsed_entries) >= len(files) * 0.8 or 
+        any(f.lower().startswith('zstack') for f in files)
+    )
+
+    sample_file = os.path.join(data_path, files[0])
+    num_pages = 1
+    w_px, h_px, bd = 0, 0, 16
+    try:
+        import tifffile
+        with tifffile.TiffFile(sample_file) as tif:
+            num_pages = len(tif.pages)
+            p0 = tif.pages[0]
+            h_px, w_px = p0.shape[-2:] if len(p0.shape) >= 2 else p0.shape
+            bd = p0.dtype.itemsize * 8
+    except Exception:
+        pass
+
+    if num_pages <= 1 and not has_zstack_names:
+        return None
+
+    if not parsed_entries and num_pages > 1:
+        for idx, f in enumerate(files):
+            num = parse_filename(f)
+            t_idx = num if num is not None else idx
+            parsed_entries.append((f, t_idx, "ch0"))
+
+    if not parsed_entries:
+        return None
+
+    tile_channel_files = {}
+    tiles_set = set()
+    channels_set = set()
+
+    for f, t_idx, ch in parsed_entries:
+        tile_channel_files[(t_idx, ch)] = f
+        tiles_set.add(t_idx)
+        channels_set.add(ch)
+
+    tiles = sorted(list(tiles_set))
+    channels = sorted(list(channels_set))
+
+    msg = f"Detected 3D Z-stack dataset with {len(tiles)} tiles, {len(channels)} channel(s) ({', '.join(channels)}), and {num_pages} z-slices per stack."
+
+    return {
+        'is_zstack': True,
+        'tiles': tiles,
+        'channels': channels,
+        'num_tiles': len(tiles),
+        'num_channels': len(channels),
+        'num_slices': num_pages,
+        'tile_channel_files': tile_channel_files,
+        'width_px': w_px,
+        'height_px': h_px,
+        'bit_depth': bd,
+        'message': msg
+    }
+
 def parse_filename(filename: str) -> Optional[int]:
     """
     Extracts the numeric suffix from a filename.
@@ -209,12 +313,13 @@ def load_files(data_path: str, prefix_filter: str = "") -> List[str]:
     files.sort()
     return files
 
-def validate_dataset(files: List[str]) -> Dict:
+def validate_dataset(files: List[str], zstack_info: Optional[Dict] = None) -> Dict:
     """
     Validates the dataset files.
     Checks for:
     - Non-empty file list
-    - Suffix continuity (gaps, missing files)
+    - Suffix continuity (gaps, missing files) for 2D slices
+    - Tile/channel completeness for 3D Z-stacks
     
     Returns a dict with:
         'valid': bool
@@ -226,7 +331,36 @@ def validate_dataset(files: List[str]) -> Dict:
     """
     if not files:
         return {'valid': False, 'message': "No files found", 'n_files': 0}
-        
+
+    # If Z-stack dataset is detected
+    if zstack_info and zstack_info.get('is_zstack'):
+        tiles = zstack_info.get('tiles', [])
+        channels = zstack_info.get('channels', [])
+        missing = []
+        for t in tiles:
+            for c in channels:
+                if (t, c) not in zstack_info.get('tile_channel_files', {}):
+                    missing.append(f"Tile {t} Ch {c}")
+        if missing:
+            return {
+                'valid': False,
+                'is_zstack': True,
+                'message': f"Found {len(files)} files, missing {len(missing)} tile-channel pairs (e.g. {missing[:5]})",
+                'n_files': len(files),
+                'min_idx': tiles[0] if tiles else 0,
+                'max_idx': tiles[-1] if tiles else 0,
+                'missing_indices': missing
+            }
+        return {
+            'valid': True,
+            'is_zstack': True,
+            'message': f"Valid 3D Z-stack dataset: {len(tiles)} tiles, {len(channels)} channel(s), {zstack_info.get('num_slices', 1)} slices/tile.",
+            'n_files': len(files),
+            'min_idx': tiles[0] if tiles else 0,
+            'max_idx': tiles[-1] if tiles else 0,
+            'missing_indices': []
+        }
+
     indices = []
     for f in files:
         idx = parse_filename(f)
@@ -1020,36 +1154,38 @@ pause
         f.write(bat_content)
 
 
-def get_tile_preview(file_path: str) -> Tuple[Optional[object], Optional[str], Optional[Dict]]:
+def get_tile_preview(file_path: str, slice_idx: int = 0, downsample: int = 1) -> Tuple[Optional[object], Optional[str], Optional[Dict]]:
     """
-    Reads a TIFF file and returns a normalized numpy array for preview.
+    Reads a TIFF file (or slice from a multi-page TIFF Z-stack) and returns a normalized numpy array for preview.
     Returns: (image_array, error_message, stats_dict)
     """
     try:
         import tifffile
         import numpy as np
         
-        # Read the first page/series
+        # Read the requested page/series
         with tifffile.TiffFile(file_path) as tif:
-            page = tif.pages[0]
+            n_pages = len(tif.pages)
+            target_page = min(max(0, slice_idx), n_pages - 1)
+            page = tif.pages[target_page]
             img = page.asarray()
             
+        if downsample > 1:
+            img = img[::downsample, ::downsample]
+
         stats = {
             'orig_min': float(np.min(img)),
             'orig_max': float(np.max(img)),
             'dtype': str(img.dtype),
-            'shape': str(img.shape)
+            'shape': str(img.shape),
+            'n_pages': n_pages
         }
 
         # Normalize for display (robust percentile-based Auto B/C)
-        # Convert to float for calculation
         img_f = img.astype(np.float32)
-        
-        # Robust min/max using percentiles
         low = np.percentile(img_f, 1)
         high = np.percentile(img_f, 99.9)
         
-        # If flat or nearly flat, fall back to min/max
         if high <= low:
             low = np.min(img_f)
             high = np.max(img_f)
@@ -1063,6 +1199,7 @@ def get_tile_preview(file_path: str) -> Tuple[Optional[object], Optional[str], O
         return img_n, None, stats
     except Exception as e:
         return None, str(e), None
+
 
     # Bash detection logic
     detection_block = f"""
@@ -1348,49 +1485,8 @@ def generate_ome_metadata(manifest: DatasetManifest, output_dir: str, channel_me
 
 
 
-def get_tile_preview(file_path: str) -> Tuple[Optional[object], Optional[str], Optional[Dict]]:
-    """
-    Reads a TIFF file and returns a normalized numpy array for preview.
-    Returns: (image_array, error_message, stats_dict)
-    """
-    try:
-        import tifffile
-        import numpy as np
-        
-        # Read the first page/series
-        with tifffile.TiffFile(file_path) as tif:
-            page = tif.pages[0]
-            img = page.asarray()
-            
-        stats = {
-            'orig_min': float(np.min(img)),
-            'orig_max': float(np.max(img)),
-            'dtype': str(img.dtype),
-            'shape': str(img.shape)
-        }
+# (Duplicate get_tile_preview removed)
 
-        # Normalize for display (robust percentile-based Auto B/C)
-        # Convert to float for calculation
-        img_f = img.astype(np.float32)
-        
-        # Robust min/max using percentiles
-        low = np.percentile(img_f, 1)
-        high = np.percentile(img_f, 99)
-        
-        # If flat or nearly flat, fall back to min/max
-        if high <= low:
-            low = np.min(img_f)
-            high = np.max(img_f)
-            
-        if high > low:
-            img_n = (img_f - low) / (high - low) * 255.0
-            img_n = np.clip(img_n, 0, 255).astype(np.uint8)
-        else:
-            img_n = np.zeros_like(img, dtype=np.uint8)
-                
-        return img_n, None, stats
-    except Exception as e:
-        return None, str(e), None
 
 def generate_stack_script(manifest: DatasetManifest, output_dir: str, data_path: str):
     """
@@ -2448,3 +2544,50 @@ def parse_local_shift_files(bundle_dir: str, subsample_step: int = 10, overlap_m
         }
         
     return None
+
+
+
+def prepare_zstack_stacks(manifest: DatasetManifest, zstack_info: Dict, output_dir: str, data_path: str) -> Tuple[int, List[str]]:
+    """
+    Sets up the 'stacks/' folder for pre-stacked Z-stacks so NRStitcher can find tile_NNN.tif
+    without running stack_tiles.py.
+    Attempts symlinks first, falling back to copying or writing a linking script if on Windows without symlink privileges.
+    """
+    stacks_dir = os.path.join(output_dir, "stacks")
+    os.makedirs(stacks_dir, exist_ok=True)
+    
+    tile_channel_files = zstack_info.get('tile_channel_files', {})
+    channels = zstack_info.get('channels', ['ch0'])
+    tiles = zstack_info.get('tiles', list(range(manifest.n_tiles_x * manifest.n_tiles_y)))
+    
+    count = 0
+    errors = []
+    
+    for t_idx in tiles:
+        for c_idx, ch in enumerate(channels):
+            raw_filename = tile_channel_files.get((t_idx, ch))
+            if not raw_filename:
+                continue
+            src_file = os.path.join(data_path, raw_filename)
+            
+            # Destination filename expected by NRStitcher
+            dst_filename = f"tile_{t_idx:03d}_ch{c_idx}.tif" if len(channels) > 1 else f"tile_{t_idx:03d}.tif"
+            dst_path = os.path.join(stacks_dir, dst_filename)
+            
+            if os.path.exists(dst_path):
+                count += 1
+                continue
+                
+            try:
+                # Try symlink
+                os.symlink(src_file, dst_path)
+                count += 1
+            except Exception as e:
+                # Try hardlink on Windows
+                try:
+                    os.link(src_file, dst_path)
+                    count += 1
+                except Exception as e2:
+                    errors.append(f"{dst_filename}: {e2}")
+                    
+    return count, errors

@@ -19,7 +19,8 @@ except:
 from core import (
     load_files, parse_filename, validate_dataset, infer_tiff_metadata,
     generate_stitch_settings, generate_local_script, generate_manifest,
-    DatasetManifest, ScanOrder, ChannelOrder, map_index, xy_to_tile_idx
+    DatasetManifest, ScanOrder, ChannelOrder, map_index, xy_to_tile_idx,
+    detect_zstack_dataset, parse_zstack_filename, prepare_zstack_stacks
 )
 
 st.set_page_config(page_title="Local Run Bundle Generator", layout="wide")
@@ -99,7 +100,7 @@ if deps_missing:
 st.sidebar.header("Dataset Configuration")
 
 # Default path for convenience (user specific)
-default_path = r"X:\nginx_share\exm\2026\pan-ASLM"
+default_path = r"J:\pan-ASLM\Allison_bestchances_images_multichannel_multitiling"
 data_path = st.sidebar.text_input(
     "Raw Data Directory",
     value=default_path,
@@ -113,7 +114,7 @@ dataset_name = st.sidebar.text_input("Dataset Name (Output Folder)", value=defau
 output_base_dir = st.sidebar.text_input("Output Location", value=os.path.dirname(__file__))
 
 st.sidebar.subheader("Metadata")
-prefix_filter = st.sidebar.text_input("Filename Prefix Filter", value="ss_single_", help="Only files starting with this will be included.")
+prefix_filter = st.sidebar.text_input("Filename Prefix Filter", value="", help="Leave empty to include all TIFF files, or enter a prefix.")
 
 # Detected metadata placeholders
 files = []
@@ -122,37 +123,57 @@ width_px = 0
 height_px = 0
 bit_depth = 0
 
+zstack_info = None
+is_zstack = False
+detected_tiles = 0
+detected_slices = 1
+detected_channels = 1
+
 if data_path and os.path.exists(data_path):
     files = load_files(data_path, prefix_filter)
-    validation_res = validate_dataset(files)
+    zstack_info = detect_zstack_dataset(data_path, files)
+    is_zstack = zstack_info is not None and zstack_info.get('is_zstack', False)
+    validation_res = validate_dataset(files, zstack_info=zstack_info)
     
     if files:
-        # Try to infer metadata from first file
-        try:
-            w, h, bd = infer_tiff_metadata(os.path.join(data_path, files[0]))
-            width_px = w
-            height_px = h
-            bit_depth = bd
-        except Exception as e:
-            st.sidebar.warning(f"Could not infer metadata: {e}")
+        if is_zstack:
+            width_px = zstack_info.get('width_px', 3200)
+            height_px = zstack_info.get('height_px', 3200)
+            bit_depth = zstack_info.get('bit_depth', 16)
+            detected_tiles = zstack_info.get('num_tiles', len(zstack_info.get('tiles', [])))
+            detected_slices = zstack_info.get('num_slices', 1)
+            detected_channels = zstack_info.get('num_channels', 1)
+        else:
+            try:
+                w, h, bd = infer_tiff_metadata(os.path.join(data_path, files[0]))
+                width_px = w
+                height_px = h
+                bit_depth = bd
+            except Exception as e:
+                st.sidebar.warning(f"Could not infer metadata: {e}")
 
 # Display Verification
 st.header("1. Dataset Validation")
 if not data_path:
     st.info("Enter a data directory to begin.")
 elif not os.path.exists(data_path):
-    st.warning("Directory does not exist on this machine. The bundle can still be generated, but file validation and tile preview will be skipped.")
+    st.warning(f"Directory `{data_path}` does not exist or is not currently connected. The bundle can still be configured, but live validation and preview will be enabled once connected.")
 else:
-    if validation_res.get('valid'):
+    if is_zstack:
+        st.success(f"✨ **3D Z-Stack Dataset Detected:** Found **{detected_tiles}** tile positions, **{detected_channels}** channel(s) ({', '.join(zstack_info.get('channels', []))}), and **{detected_slices}** z-slices per stack. (2D slicing/stacking will be skipped).")
+    elif validation_res.get('valid'):
         st.success(f"Validation Passed: {validation_res['message']}")
     else:
         st.warning(f"Validation Issues: {validation_res.get('message')}")
         if validation_res.get('missing_indices'):
             st.error(f"Missing Indices Samples: {validation_res['missing_indices'][:10]}")
 
-    st.write(f"**Total Files Found:** {len(files)}")
-    if files:
-        st.write(f"**Sample File:** `{files[0]}`")
+    c_cnt1, c_cnt2 = st.columns(2)
+    with c_cnt1:
+        st.write(f"**Total Files Found:** `{len(files)}`")
+    with c_cnt2:
+        if files:
+            st.write(f"**Sample File:** `{files[0]}`")
 
 # --- Parameters Form ---
 st.header("2. Run Parameters")
@@ -166,10 +187,30 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.subheader("Dimensions")
-    n_tiles_x = st.number_input("Tiles X", min_value=1, value=5)
-    n_tiles_y = st.number_input("Tiles Y", min_value=1, value=5)
-    z_slices = st.number_input("Z Slices", min_value=1, value=200)
-    n_channels = st.number_input("Channels", min_value=1, value=1)
+    # Determine intelligent defaults
+    if 'n_tiles_x' not in st.session_state:
+        if is_zstack and detected_tiles == 9:
+            st.session_state['n_tiles_x'] = 3
+            st.session_state['n_tiles_y'] = 3
+        elif is_zstack and detected_tiles > 0:
+            import math
+            sqrt_t = int(math.isqrt(detected_tiles))
+            st.session_state['n_tiles_x'] = sqrt_t if sqrt_t * sqrt_t == detected_tiles else detected_tiles
+            st.session_state['n_tiles_y'] = sqrt_t if sqrt_t * sqrt_t == detected_tiles else 1
+        else:
+            st.session_state['n_tiles_x'] = 5
+            st.session_state['n_tiles_y'] = 5
+
+    def_slices = detected_slices if is_zstack else 200
+    def_ch = detected_channels if is_zstack else 1
+
+    n_tiles_x = st.number_input("Tiles X", min_value=1, value=st.session_state['n_tiles_x'], key="main_n_tiles_x")
+    n_tiles_y = st.number_input("Tiles Y", min_value=1, value=st.session_state['n_tiles_y'], key="main_n_tiles_y")
+    z_slices = st.number_input("Z Slices", min_value=1, value=def_slices)
+    n_channels = st.number_input("Channels", min_value=1, value=def_ch)
+    
+    st.session_state['n_tiles_x'] = n_tiles_x
+    st.session_state['n_tiles_y'] = n_tiles_y
 
 with col2:
     st.subheader("Geometry")
@@ -235,12 +276,20 @@ if n_channels > 0:
             channel_meta.append((name, ex_wl, em_wl))
 
 # Validation of counts
-expected_total = n_tiles_x * n_tiles_y * z_slices * n_channels
-curr_total = len(files)
-st.metric("Expected File Count", expected_total, delta=curr_total - expected_total, delta_color="inverse")
-
-if curr_total != expected_total:
-    st.error(f"Count Mismatch! Found {curr_total}, expected {expected_total}. Check parameters.")
+if is_zstack:
+    expected_total = n_tiles_x * n_tiles_y * n_channels
+    curr_total = len(files)
+    st.metric("Expected File Count (Z-Stacks)", expected_total, delta=curr_total - expected_total, delta_color="inverse")
+    if curr_total == expected_total:
+        st.success(f"Perfect match: Found {curr_total} Z-stack files for {n_tiles_x}×{n_tiles_y} tiles across {n_channels} channel(s).")
+    else:
+        st.warning(f"File count mismatch: Found {curr_total} files, expected {expected_total} ({n_tiles_x}×{n_tiles_y} tiles × {n_channels} channels). Adjust N or M.")
+else:
+    expected_total = n_tiles_x * n_tiles_y * z_slices * n_channels
+    curr_total = len(files)
+    st.metric("Expected File Count", expected_total, delta=curr_total - expected_total, delta_color="inverse")
+    if curr_total != expected_total:
+        st.error(f"Count Mismatch! Found {curr_total}, expected {expected_total}. Check parameters.")
 
 # --- Execution Config ---
 with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=False):
@@ -376,295 +425,297 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
         else:
             st.write(f"**Total files loaded:** `{len(files)}`")
             
-            preview_tab1, preview_tab2 = st.tabs(["📷 Single Tile", "🔲 Grid View (up to 3×3)"])
+            preview_tab1, preview_tab2 = st.tabs(["Single Tile", "Grid View (N × M Montage)"])
             
             with preview_tab1:
-                # Replaced linear index with Tile/Z/Channel selectors
-                
-                # 1. Tile Selector
                 n_tiles_total = n_tiles_x * n_tiles_y
                 pt_t = st.slider(
                     "Tile Index", 
                     min_value=0, 
-                    max_value=n_tiles_total-1, 
+                    max_value=max(0, n_tiles_total-1), 
                     value=0, 
                     step=1,
                     help=f"Select Tile (0 to {n_tiles_total-1}). Layout depends on Scan Order."
                 )
                 
-                # 2. Z Selector
-                if z_slices > 1:
-                    pt_z = st.slider("Z-Slice", 0, z_slices-1, 0, key="pt_z")
+                max_z_slices = detected_slices if is_zstack else z_slices
+                if max_z_slices > 1:
+                    pt_z = st.slider("Z-Slice", 0, max_z_slices-1, 0, key="pt_z")
                 else:
                     pt_z = 0
-                    
-                # 3. Channel Selector
+
                 if n_channels > 1:
-                    pt_c = st.slider("Channel", 0, n_channels-1, 0, key="pt_c")
+                    if is_zstack and zstack_info:
+                        ch_names = zstack_info.get('channels', [str(i) for i in range(n_channels)])
+                        pt_c_sel = st.selectbox("Channel", ch_names, index=0, key="pt_c_sel")
+                        pt_c = ch_names.index(pt_c_sel)
+                    else:
+                        pt_c = st.slider("Channel", 0, n_channels-1, 0, key="pt_c")
                 else:
                     pt_c = 0
+                    pt_c_sel = zstack_info.get('channels', ['ch0'])[0] if is_zstack and zstack_info else "ch0"
 
-                # Calculate linear index
-                # Order: Tile -> Z -> Channel (Fastest)
-                # idx = t * (n_c * n_z) + z * n_c + c
-                preview_idx = pt_t * (n_channels * z_slices) + pt_z * n_channels + pt_c
+                selected_file = None
+                full_path = None
                 
-                # Bounds check
-                if preview_idx < 0 or preview_idx >= len(files):
-                    st.error(f"Calculated index {preview_idx} is out of bounds (0-{len(files)-1}). Check parameters.")
-                    st.stop()
-                
-                selected_file = files[preview_idx]
-                full_path = os.path.join(data_path, selected_file)
-                
-                # Calc metadata (redundant check, but good for display)
-                t_idx, z_idx, c_idx = map_index(preview_idx, n_channels, z_slices)
-                st.write(f"**Filename:** `{selected_file}`")
-                
-                # Format mapping string with optional metadata
-                meta_str = ""
-                if c_idx < len(channel_meta):
-                    if len(channel_meta[c_idx]) == 3:
-                         name, ex_wl, em_wl = channel_meta[c_idx]
-                         parts = [p for p in [name, ex_wl, em_wl] if p and p.strip()]
-                    else:
-                         name, wl = channel_meta[c_idx]
-                         parts = [p for p in [name, wl] if p and p.strip()]
-                         
-                    if parts:
-                        meta_str = f" (**{' - '.join(parts)}**)"
-                
-                st.markdown(f"""
-                **Mapping Indices:**
-                *   **Tile (XY)**: `{t_idx}`
-                *   **Z-Slice**: `{z_idx}`
-                *   **Channel**: `{c_idx}` {meta_str}
-                """)
-                
-                if os.path.exists(full_path):
-                    from core import get_tile_preview
-                    import importlib
-                    import core as _core_mod
-                    importlib.reload(_core_mod)
-                    from core import get_tile_preview
-                    
-                    img, err, stats = get_tile_preview(full_path)
-                    
-                    if img is not None:
-                        st.image(img, caption=f"Preview (Auto B/C) - {selected_file}", use_container_width=True, clamp=True)
-                        if stats:
-                            st.caption(f"Stats: Min={stats['orig_min']:.1f}, Max={stats['orig_max']:.1f}, Type={stats['dtype']}")
-                    else:
-                        st.error(f"Could not load image: {err}")
+                if is_zstack and zstack_info:
+                    raw_f = zstack_info['tile_channel_files'].get((pt_t, pt_c_sel))
+                    if raw_f:
+                        selected_file = raw_f
+                        full_path = os.path.join(data_path, raw_f)
+                    t_idx, z_idx, c_idx = pt_t, pt_z, pt_c
                 else:
-                    st.error("File not found on disk.")
+                    preview_idx = pt_t * (n_channels * z_slices) + pt_z * n_channels + pt_c
+                    if 0 <= preview_idx < len(files):
+                        selected_file = files[preview_idx]
+                        full_path = os.path.join(data_path, selected_file)
+                        t_idx, z_idx, c_idx = map_index(preview_idx, n_channels, z_slices)
+
+                if selected_file:
+                    st.write(f"**Filename:** `{selected_file}`")
+                    st.markdown(f"""
+                    **Mapping Indices:**
+                    *   **Tile (XY)**: `{t_idx}`
+                    *   **Z-Slice**: `{z_idx}`
+                    *   **Channel**: `{c_idx}`
+                    """)
+                    
+                    if full_path and os.path.exists(full_path):
+                        from core import get_tile_preview
+                        img, err, stats = get_tile_preview(full_path, slice_idx=pt_z, downsample=1)
+                        if img is not None:
+                            st.image(img, caption=f"Preview (Auto B/C) - {selected_file}", use_container_width=True, clamp=True)
+                            if stats:
+                                st.caption(f"Stats: Min={stats['orig_min']:.1f}, Max={stats['orig_max']:.1f}, Type={stats['dtype']}")
+                        else:
+                            st.error(f"Could not load image: {err}")
+                    else:
+                        st.error("File not found on disk.")
+                else:
+                    st.warning(f"Tile {pt_t} channel {pt_c} is not available in dataset.")
             
             with preview_tab2:
-                # Grid View - up to 3x3 tiles
-                grid_cols_count = min(3, n_tiles_x)
-                grid_rows_count = min(3, n_tiles_y)
-                
-                # Layout: Left Column (Controls) | Right Column (Mini-Map)
+                # Layout: Left Column (Controls & N x M adjustment) | Right Column (Mini-Map)
                 layout_cols = st.columns([1, 1])
-                
-                # Initialize variable for safety
-                grid_offset_x = 0
-                grid_offset_y = 0
-                grid_scan_order = ScanOrder.COL_SERPENTINE.value
                 
                 # --- LEFT COLUMN: Controls ---
                 with layout_cols[0]:
-                    st.write(f"Showing **{grid_cols_count}×{grid_rows_count}** tile grid (of {n_tiles_x}×{n_tiles_y} total)")
+                    st.subheader("Montage Size (N × M)")
                     
-                    if n_channels > 1:
-                        grid_ch = st.slider("Channel", min_value=0, max_value=n_channels-1, value=0, key="grid_ch")
+                    # N and M inputs directly in the preview!
+                    mn_c1, mn_c2 = st.columns(2)
+                    with mn_c1:
+                        grid_nx = st.number_input("Montage N (Tiles X)", min_value=1, max_value=50, value=st.session_state.get('n_tiles_x', 3), key="prev_nx")
+                    with mn_c2:
+                        grid_ny = st.number_input("Montage M (Tiles Y)", min_value=1, max_value=50, value=st.session_state.get('n_tiles_y', 3), key="prev_ny")
+
+                    # Preset buttons and auto-calc helpers
+                    tot_t = detected_tiles if is_zstack else (n_tiles_x * n_tiles_y)
+                    st.caption(f"Total tiles detected: **{tot_t}**. Current montage: **{grid_nx} × {grid_ny} = {grid_nx * grid_ny}** tiles.")
+                    
+                    p_cols = st.columns([1, 1, 1])
+                    with p_cols[0]:
+                        if st.button("Apply N×M to Config", help="Save these N and M dimensions to Run Parameters above"):
+                            st.session_state['n_tiles_x'] = grid_nx
+                            st.session_state['n_tiles_y'] = grid_ny
+                            st.success(f"Updated config to {grid_nx}×{grid_ny}!")
+                            st.rerun()
+                    with p_cols[1]:
+                        if tot_t > 0 and st.button(f"Auto-calc M from N", help=f"Set M = ceil({tot_t} / N)"):
+                            import math
+                            calc_m = math.ceil(tot_t / grid_nx)
+                            st.session_state['n_tiles_y'] = calc_m
+                            st.rerun()
+                    with p_cols[2]:
+                        if tot_t == 9 and (grid_nx != 3 or grid_ny != 3):
+                            if st.button("Preset: 3 × 3"):
+                                st.session_state['n_tiles_x'] = 3
+                                st.session_state['n_tiles_y'] = 3
+                                st.rerun()
+
+                    # View Mode: Full Montage vs 3x3 Window
+                    view_full = True
+                    if grid_nx > 3 or grid_ny > 3:
+                        view_mode = st.radio("Montage View Mode", ["Full N × M Montage", "Zoomed Window (3×3)"], index=0, horizontal=True)
+                        view_full = (view_mode == "Full N × M Montage")
+                    
+                    if view_full:
+                        grid_cols_count = grid_nx
+                        grid_rows_count = grid_ny
+                        grid_offset_x = 0
+                        grid_offset_y = 0
                     else:
-                        grid_ch = 0
-                        st.caption("Channel: 0 (single)")
+                        grid_cols_count = min(3, grid_nx)
+                        grid_rows_count = min(3, grid_ny)
+                        if grid_nx > grid_cols_count:
+                            grid_offset_x = st.slider("Start at Tile X", min_value=0, max_value=max(0, grid_nx - grid_cols_count), value=0, key="grid_ox")
+                        else:
+                            grid_offset_x = 0
+                        if grid_ny > grid_rows_count:
+                            grid_offset_y = st.slider("Start at Tile Y", min_value=0, max_value=max(0, grid_ny - grid_rows_count), value=0, key="grid_oy")
+                        else:
+                            grid_offset_y = 0
                     
-                    if z_slices > 1:
-                        grid_z = st.slider("Z-Slice", min_value=0, max_value=z_slices-1, value=z_slices // 2, key="grid_z")
-                    else:
-                        grid_z = 0
-                        st.caption("Z-Slice: 0 (single)")
-                        
-                    # Offsets - X
-                    if n_tiles_x > grid_cols_count:
-                        grid_offset_x = st.slider("Start at Tile X", min_value=0, max_value=max(0, n_tiles_x - grid_cols_count), value=0, key="grid_ox")
-                    
-                    # Offsets - Y (Under X)
-                    if n_tiles_y > grid_rows_count:
-                        grid_offset_y = st.slider("Start at Tile Y", min_value=0, max_value=max(0, n_tiles_y - grid_rows_count), value=0, key="grid_oy")
-                    
-                    # Scan Order (Half Size)
-                    sub_cols = st.columns(2)
-                    with sub_cols[0]:
-                        all_orders = [e.value for e in ScanOrder]
-                        curr_order_idx = all_orders.index(scan_order) if scan_order in all_orders else 0
-                        grid_scan_order = st.selectbox(
-                            "Scan Order (Preview)", 
-                            all_orders, 
-                            index=curr_order_idx,
-                            key="grid_order_select",
-                            help="Test scan orders."
-                        )
+                    # Channel & Z-slice
+                    ch_col, z_col = st.columns(2)
+                    with ch_col:
+                        if is_zstack and zstack_info:
+                            ch_names = zstack_info.get('channels', ['ch0'])
+                            selected_grid_ch = st.selectbox("Channel", ch_names, index=0, key="grid_ch_zstack")
+                            grid_ch = ch_names.index(selected_grid_ch)
+                        elif n_channels > 1:
+                            grid_ch = st.slider("Channel", min_value=0, max_value=n_channels-1, value=0, key="grid_ch")
+                            selected_grid_ch = str(grid_ch)
+                        else:
+                            grid_ch = 0
+                            selected_grid_ch = "ch0"
+                            st.caption("Channel: 0 (single)")
+
+                    with z_col:
+                        max_z_slices = detected_slices if is_zstack else z_slices
+                        if max_z_slices > 1:
+                            grid_z = st.slider("Z-Slice", min_value=0, max_value=max_z_slices-1, value=0, key="grid_z", help="Slice 0 is the first slice of each z-stack")
+                        else:
+                            grid_z = 0
+                            st.caption("Z-Slice: 0 (single)")
+
+                    # Scan Order
+                    all_orders = [e.value for e in ScanOrder]
+                    curr_order_idx = all_orders.index(scan_order) if scan_order in all_orders else 0
+                    grid_scan_order = st.selectbox(
+                        "Scan Order (Preview)", 
+                        all_orders, 
+                        index=curr_order_idx,
+                        key="grid_order_select",
+                        help="Test scan patterns to see how tiles fit together."
+                    )
                 
                 # --- RIGHT COLUMN: Mini-Map ---
                 with layout_cols[1]:
-                    if n_tiles_x > 0 and n_tiles_y > 0:
+                    if grid_nx > 0 and grid_ny > 0:
                         try:
                             import matplotlib.pyplot as plt
-                            import matplotlib.patches as patches
                             
-                            # Use variable directly (defined in Left Col)
-                            # Use variable directly (defined in Left Col)
-                            cur_oy = grid_offset_y
-                            
-                            # Resize: User requested significantly bigger (roughly 2.5x original or bigger).
-                            # We remove sub-columns and let it fill the right column (50% page width).
-                            
-                            # create figure - large
                             fig, ax = plt.subplots(figsize=(6, 5))
-                            # Inverted colors
                             fig.patch.set_facecolor('black')
                             ax.set_facecolor('black')
                             
-                            ax.set_xlim(-0.5, n_tiles_x - 0.5)
-                            ax.set_ylim(-0.5, n_tiles_y - 0.5)
+                            ax.set_xlim(-0.7, grid_nx - 0.3)
+                            ax.set_ylim(-0.7, grid_ny - 0.3)
                             ax.set_aspect('equal')
-                            # Remove axes/titles
                             ax.axis('off')
                             
-                            # Grid dots (Grey/Dim)
-                            all_x = []
-                            all_y = []
-                            for y in range(n_tiles_y):
-                                for x in range(n_tiles_x):
-                                    all_x.append(x)
-                                    all_y.append(y)
-                            ax.scatter(all_x, all_y, c='#666666', marker='s', s=100) # Lighter grey dots
+                            tot_grid_tiles = grid_nx * grid_ny
+                            tile_coords = {}
+                            all_x, all_y = [], []
+                            for gy in range(grid_ny):
+                                for gx in range(grid_nx):
+                                    tidx = xy_to_tile_idx(gx, gy, grid_nx, grid_ny, grid_scan_order)
+                                    tile_coords[tidx] = (gx, gy)
+                                    all_x.append(gx)
+                                    all_y.append(gy)
                             
-                            # Current Window (Green Highlight)
-                            sel_w = min(3, n_tiles_x - grid_offset_x)
-                            # Ensure window doesn't exceed bounds visually
+                            path_pts = [tile_coords[t] for t in range(tot_grid_tiles) if t in tile_coords]
+                            if path_pts:
+                                pxs, pys = zip(*path_pts)
+                                ax.plot(pxs, pys, color='#3b82f6', linestyle='--', linewidth=1.5, alpha=0.6, zorder=1)
                             
-                            # Highlight active window tiles
-                            act_x = []
-                            act_y = []
-                            for row_i in range(min(3, n_tiles_y)):
-                                for col_i in range(min(3, n_tiles_x)):
-                                        gx = grid_offset_x + col_i
-                                        gy = cur_oy + row_i
-                                        if gx < n_tiles_x and gy < n_tiles_y:
-                                            act_x.append(gx)
-                                            act_y.append(gy)
-                            ax.scatter(act_x, act_y, c='#22c55e', marker='s', s=100) # Green dots
+                            ax.scatter(all_x, all_y, c='#444444', marker='s', s=220, zorder=2)
                             
-                            st.pyplot(fig, use_container_width=True) # Fills the column
+                            act_x, act_y = [], []
+                            for row_i in range(grid_rows_count):
+                                for col_i in range(grid_cols_count):
+                                    gx = grid_offset_x + col_i
+                                    gy = (grid_offset_y + grid_rows_count - 1) - row_i if view_full else (grid_offset_y + row_i)
+                                    if gx < grid_nx and gy < grid_ny:
+                                        act_x.append(gx)
+                                        act_y.append(gy)
+                            ax.scatter(act_x, act_y, c='#22c55e', marker='s', s=240, zorder=3)
                             
-                        except ImportError:
-                            st.warning("Install `matplotlib` for map.")
+                            for tidx, (gx, gy) in tile_coords.items():
+                                ax.text(gx, gy, f"{tidx}", color='white', fontsize=9, ha='center', va='center', fontweight='bold', zorder=4)
+                                
+                            st.pyplot(fig, use_container_width=True)
+                            st.caption(f"Mini-Map: Showing {grid_nx}×{grid_ny} grid. Green = Active window, Blue line = Scan path.")
+                        except Exception as e:
+                            st.warning(f"Map rendering: {e}")
 
-                # Helper: tile_idx + z + ch -> linear file index
-                def tile_to_file_idx(tile_idx, z, ch, n_ch, n_z):
-                    return tile_idx * (n_ch * n_z) + z * n_ch + ch
-                
-                # Lazy-load preview function
-                from core import get_tile_preview
-                import importlib
-                import core as _core_mod
-                importlib.reload(_core_mod)
-                from core import get_tile_preview, xy_to_tile_idx # Ensure xy_to_tile_idx is imported
-                
-                # -- Render Composite Grid (Pixel Perfect) --
+                # --- Render Composite Montage (Pixel Perfect with Overlap) ---
                 try:
                     from PIL import Image, ImageDraw, ImageFont
+                    from core import get_tile_preview
                     
-                    # We need the first valid image to know dimensions
-                    first_valid = None
-                    
-                    # Pre-scan for first valid image
-                    # Just check T0? Or iterate?
-                    # Let's assume standard size from first available.
-                    # Actually we can just load them on the fly.
-                    
-                    # To determine canvas size, we need W/H.
-                    # Let's try to load the very first tile in the window:
-                    # (grid_offset_x, (grid_offset_y + grid_rows_count - 1)) etc?
-                    # Simpler: just loop and load all into a dict first.
-                    
-                    grid_images = {} # Key: (row, col) -> Image
+                    grid_images = {}
                     tile_w, tile_h = 0, 0
+                    
+                    ds_factor = 4 if max(grid_nx, grid_ny) <= 4 else 8
                     
                     for row in range(grid_rows_count):
                         gy = (grid_offset_y + grid_rows_count - 1) - row
                         for col in range(grid_cols_count):
                             gx = grid_offset_x + col
                             
-                            tile_idx = xy_to_tile_idx(gx, gy, n_tiles_x, n_tiles_y, grid_scan_order)
-                            file_idx = tile_to_file_idx(tile_idx, grid_z, grid_ch, n_channels, z_slices)
+                            tile_idx = xy_to_tile_idx(gx, gy, grid_nx, grid_ny, grid_scan_order)
                             
-                            if file_idx < len(files):
-                                fpath = os.path.join(data_path, files[file_idx])
-                                if os.path.exists(fpath):
-                                    img_arr, _, _ = get_tile_preview(fpath) # Returns numpy array (RGB or Gray)
-                                    if img_arr is not None:
-                                        # Convert numpy to PIL
-                                        # Check limits
-                                        pil_img = Image.fromarray(img_arr)
-                                        grid_images[(row, col)] = (pil_img, tile_idx)
-                                        if tile_w == 0:
-                                            tile_w, tile_h = pil_img.size
+                            img_arr = None
+                            if is_zstack and zstack_info:
+                                raw_f = zstack_info['tile_channel_files'].get((tile_idx, selected_grid_ch))
+                                if raw_f:
+                                    fpath = os.path.join(data_path, raw_f)
+                                    if os.path.exists(fpath):
+                                        img_arr, _, _ = get_tile_preview(fpath, slice_idx=grid_z, downsample=ds_factor)
+                            else:
+                                file_idx = tile_to_file_idx(tile_idx, grid_z, grid_ch, n_channels, z_slices)
+                                if file_idx < len(files):
+                                    fpath = os.path.join(data_path, files[file_idx])
+                                    if os.path.exists(fpath):
+                                        img_arr, _, _ = get_tile_preview(fpath, slice_idx=0, downsample=ds_factor)
+                            
+                            if img_arr is not None:
+                                pil_img = Image.fromarray(img_arr)
+                                grid_images[(row, col)] = (pil_img, tile_idx)
+                                if tile_w == 0:
+                                    tile_w, tile_h = pil_img.size
+                            else:
+                                grid_images[(row, col)] = (None, tile_idx)
                     
-                    if tile_w > 0 and tile_h > 0:
-                        # Calculate Canvas with Overlap
-                        # Overlap is percentage of size? User inputs overlap_x (float) e.g. 10.0
-                        ov_x_px = int(tile_w * (overlap_x / 100.0))
-                        ov_y_px = int(tile_h * (overlap_y / 100.0))
-                        
-                        # Canvas Size
-                        # Width = (W * Cols) - (Overlap * (Cols-1))
-                        canvas_w = (tile_w * grid_cols_count) - (ov_x_px * (grid_cols_count - 1))
-                        canvas_h = (tile_h * grid_rows_count) - (ov_y_px * (grid_rows_count - 1))
-                        
-                        # Ensure positive (overlap < 100%)
-                        canvas_w = max(canvas_w, tile_w)
-                        canvas_h = max(canvas_h, tile_h)
-                        
-                        composite = Image.new('RGB', (canvas_w, canvas_h), (0, 0, 0))
-                        draw = ImageDraw.Draw(composite)
-                        
-                        for row in range(grid_rows_count):
-                            for col in range(grid_cols_count):
-                                if (row, col) in grid_images:
-                                    img, tidx = grid_images[(row, col)]
-                                    
-                                    # Position
-                                    # x = col * (W - Overlap)
-                                    pos_x = col * (tile_w - ov_x_px)
-                                    pos_y = row * (tile_h - ov_y_px)
-                                    
+                    if tile_w == 0:
+                        tile_w, tile_h = 200, 200
+
+                    ov_x_px = int(tile_w * (overlap_x / 100.0))
+                    ov_y_px = int(tile_h * (overlap_y / 100.0))
+                    
+                    canvas_w = (tile_w * grid_cols_count) - (ov_x_px * (grid_cols_count - 1))
+                    canvas_h = (tile_h * grid_rows_count) - (ov_y_px * (grid_rows_count - 1))
+                    
+                    canvas_w = max(canvas_w, tile_w)
+                    canvas_h = max(canvas_h, tile_h)
+                    
+                    composite = Image.new('RGB', (canvas_w, canvas_h), (15, 15, 15))
+                    draw = ImageDraw.Draw(composite)
+                    
+                    for row in range(grid_rows_count):
+                        for col in range(grid_cols_count):
+                            if (row, col) in grid_images:
+                                img, tidx = grid_images[(row, col)]
+                                pos_x = col * (tile_w - ov_x_px)
+                                pos_y = row * (tile_h - ov_y_px)
+                                
+                                if img is not None:
                                     composite.paste(img, (pos_x, pos_y))
-                                    
-                                    # Draw Text
-                                    txt = f"T{tidx}"
-                                    # Default font
-                                    # Draw Top-Left with shadow for visibility
-                                    txt_pos = (pos_x + 5, pos_y + 5)
-                                    draw.text((txt_pos[0]+1, txt_pos[1]+1), txt, fill="black")
-                                    draw.text(txt_pos, txt, fill="white")
-                                    
-                        st.image(composite, caption="Rough preview, not the final stitch", width="stretch")
-                    else:
-                        st.warning("No valid images found in this grid view region.")
-                        
+                                else:
+                                    draw.rectangle([pos_x, pos_y, pos_x + tile_w - ov_x_px, pos_y + tile_h - ov_y_px], fill=(30, 30, 30), outline=(60, 60, 60))
+                                
+                                txt = f"T{tidx}"
+                                txt_pos = (pos_x + 8, pos_y + 8)
+                                draw.text((txt_pos[0]+1, txt_pos[1]+1), txt, fill="black")
+                                draw.text(txt_pos, txt, fill="#22c55e" if img is not None else "#ef4444")
+                                
+                    st.image(composite, caption=f"Montage Preview ({grid_cols_count} × {grid_rows_count} tiles) - Scan Order: {grid_scan_order}", use_container_width=True)
                 except Exception as e:
                     st.error(f"Error generating composite preview: {e}")
-                    # Fallback? No, just error.
 
-                # Replaced Loop
-                # for row in range(grid_rows_count):
-                # ... [Old Loop Removed] ...
+
 
 
     # Refactoring layout to put Tiles View toggle in Execution Config or right before Generate
@@ -741,8 +792,16 @@ with st.expander("⚙️ Execution, Bundle Generation & Verification", expanded=
                     st.info("On Windows, Symlinks require 'Developer Mode'. Falling back to absolute paths in config.")
                     tiles_created_ok = False
             
-            # Generate Stacking Script (Preprocessing)
-            core.generate_stack_script(manifest, output_dir, data_path)
+            # Prepare Stacks for Stitcher
+            if is_zstack and zstack_info:
+                st.info("Dataset consists of 3D Z-stacks. Preparing stack links in 'stacks/'...")
+                st_count, st_errs = prepare_zstack_stacks(manifest, zstack_info, output_dir, data_path)
+                st.success(f"Configured {st_count} tile stack(s) in 'stacks/' without re-slicing.")
+                if st_errs:
+                    st.warning(f"Stack link notices: {st_errs[:3]}")
+            else:
+                # Generate Stacking Script (Preprocessing for 2D slices)
+                core.generate_stack_script(manifest, output_dir, data_path)
 
             # QC: per-tile mosaic preview (Fiji-friendly multi-page BigTIFF)
             core.generate_tile_grid_viewer(manifest, output_dir)
