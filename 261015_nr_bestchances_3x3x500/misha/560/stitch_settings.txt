@@ -1,0 +1,32 @@
+; nr_stitcher settings, channel 560 nm, 3x3 tiles x 500 z, 3200 px tiles @ 2720 px pitch
+; parameters identical to the completed 488 run of 2026-10-13
+
+[stitch]
+sample_name = bestchances_560
+binning = 1
+point_spacing = 20
+coarse_block_radius = [25, 25, 25]
+coarse_binning = 4
+fine_block_radius = [25, 25, 25]
+fine_binning = 1
+normalize_in_blockmatch = True
+normalize_while_stitching = False
+global_optimization = True
+allow_rotation = True
+allow_local_deformations = True
+zeroes_are_missing_values = True
+displacement_filter_threshold = 3
+max_block_size = 0
+cluster = None
+output_format = raw
+
+[positions]
+raw/Zstack00000560.tif = 0, 0, 0
+raw/Zstack00001560.tif = 0, 2720, 0
+raw/Zstack00002560.tif = 0, 5440, 0
+raw/Zstack00003560.tif = 2720, 5440, 0
+raw/Zstack00004560.tif = 2720, 2720, 0
+raw/Zstack00005560.tif = 2720, 0, 0
+raw/Zstack00006560.tif = 5440, 0, 0
+raw/Zstack00007560.tif = 5440, 2720, 0
+raw/Zstack00008560.tif = 5440, 5440, 0

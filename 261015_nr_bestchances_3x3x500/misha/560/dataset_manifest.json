@@ -1,0 +1,29 @@
+{
+  "dataset_name": "bestchances_560",
+  "n_tiles_x": 3,
+  "n_tiles_y": 3,
+  "z_slices": 500,
+  "n_channels": 1,
+  "overlap_x": 15,
+  "overlap_y": 15,
+  "voxel_size_x_um": 0.203125,
+  "voxel_size_y_um": 0.203125,
+  "voxel_size_z_um": 0.2,
+  "scan_order": "Column Serpentine (pan-ASLM)",
+  "channel_order": "interleaved_per_z",
+  "width_px": 3200,
+  "height_px": 3200,
+  "bit_depth": 16,
+  "prefix_filter": "Zstack",
+  "files": [
+    "Zstack00000560.tif",
+    "Zstack00001560.tif",
+    "Zstack00002560.tif",
+    "Zstack00003560.tif",
+    "Zstack00004560.tif",
+    "Zstack00005560.tif",
+    "Zstack00006560.tif",
+    "Zstack00007560.tif",
+    "Zstack00008560.tif"
+  ]
+}
